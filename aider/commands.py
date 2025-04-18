@@ -1603,8 +1603,9 @@ class Commands:
             for i in range(1, step_count + 1):
                 self.io.tool_output(f"Implementing step {i}")
                 prompt = (
-                    f"Implement setp {i} of the plan in in the .md file called:"
-                    f" {Path(plan_path).name}"
+                    f"Implement setp {i} of the plan in in the .md file"
+                    f" {Path(plan_path).name}. Add any files, you "
+                    "require to implement this step, to this chat."
                 )
                 step_coder = Coder.create(
                     io=self.io,
@@ -1619,7 +1620,10 @@ class Commands:
             self.io.tool_output(
                 "Unable to determine number of steps. Will try to solve them all at once."
             )
-            prompt = f"Please, implement the plan in the {Path(plan_path).name} file step by step."
+            prompt = (
+                f"Please, implement the plan in the {Path(plan_path).name} file step by step. Add"
+                " any files, you require to implement this plan, to this chat."
+            )
             self.cmd_code(prompt)
         finally:
             self.io.confirm_ask = original_confirm_ask
