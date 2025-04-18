@@ -1953,6 +1953,65 @@ class TestCommands(TestCase):
             self.assertEqual(len(coder.abs_read_only_fnames), 0)
             self.assertEqual(len(coder.cur_messages), 0)
             self.assertEqual(len(coder.done_messages), 0)
+            
+    def test_cmd_code_from_plan_positive(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create a test plan file
+            plan_file = Path(repo_dir) / "test_plan.md"
+            plan_content = """# Test Plan
+            
+## Step 1
+- Create a function that adds two numbers
+
+## Step 2
+- Create a function that multiplies two numbers
+"""
+            plan_file.write_text(plan_content)
+            
+            # Mock the necessary methods
+            with (
+                mock.patch.object(commands, "_run_new_coder") as mock_run_new_coder,
+                mock.patch.object(commands, "_from_plan_exist_strategy") as mock_from_plan_exist_strategy,
+                mock.patch.object(io, "auto_confirm_ask", return_value=True) as mock_auto_confirm,
+                mock.patch.object(io, "tool_output") as mock_tool_output,
+            ):
+                # Mock the coder.run method to return a step count
+                mock_run_instance = mock.MagicMock()
+                mock_run_instance.run.return_value = "2"
+                
+                with mock.patch("aider.coders.base_coder.Coder.create", return_value=mock_run_instance):
+                    # Execute the command
+                    commands.cmd_code_from_plan(str(plan_file))
+                    
+                    # Verify that the plan file was added to the chat
+                    mock_run_instance.run.assert_called_once()
+                    
+                    # Verify that _run_new_coder was called twice (once for each step)
+                    self.assertEqual(mock_run_new_coder.call_count, 2)
+                    
+                    # Verify the arguments for the first call to _run_new_coder
+                    first_call_args = mock_run_new_coder.call_args_list[0][0]
+                    self.assertIn("step 1", first_call_args[0].lower())
+                    self.assertEqual(first_call_args[1], ["test_plan.md"])
+                    self.assertFalse(first_call_args[2])
+                    
+                    # Verify the arguments for the second call to _run_new_coder
+                    second_call_args = mock_run_new_coder.call_args_list[1][0]
+                    self.assertIn("step 2", second_call_args[0].lower())
+                    self.assertEqual(second_call_args[1], ["test_plan.md"])
+                    self.assertFalse(second_call_args[2])
+                    
+                    # Verify that _from_plan_exist_strategy was called once
+                    mock_from_plan_exist_strategy.assert_called_once()
+                    
+                    # Verify that tool_output was called with the expected messages
+                    mock_tool_output.assert_any_call("Found 2 steps in the plan.")
+                    mock_tool_output.assert_any_call("Implementing step 1")
+                    mock_tool_output.assert_any_call("Implementing step 2")
 
     def test_cmd_reasoning_effort(self):
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
