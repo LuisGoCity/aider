@@ -2277,6 +2277,42 @@ class TestCommands(TestCase):
                 
                 # Verify that cmd_drop was not called since an exception occurred
                 mock_cmd_drop.assert_not_called()
+                
+    def test_from_plan_exist_strategy(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create a test file
+            test_file = Path(repo_dir) / "test_file.py"
+            test_file.write_text("def hello():\n    return 'Hello, World!'\n")
+            
+            # Add the file to the chat
+            commands.cmd_add(str(test_file))
+            
+            # Create a mock for the original_confirmation_ask_method
+            original_confirm_ask = mock.MagicMock()
+            
+            # Mock tool_output to verify completion message
+            with mock.patch.object(io, "tool_output") as mock_tool_output:
+                # Test that SwitchCoder is raised with the correct parameters
+                with self.assertRaises(SwitchCoder) as context:
+                    commands._from_plan_exist_strategy(original_confirm_ask)
+                
+                # Verify that the completion message was shown
+                mock_tool_output.assert_called_with("\nPlan execution completed!")
+                
+                # Verify that the io.confirm_ask was restored to the original method
+                self.assertEqual(io.confirm_ask, original_confirm_ask)
+                
+                # Verify the SwitchCoder exception contains the correct parameters
+                exception = context.exception
+                self.assertEqual(exception.kwargs.get("edit_format"), coder.edit_format)
+                self.assertEqual(exception.kwargs.get("summarize_from_coder"), False)
+                self.assertEqual(exception.kwargs.get("from_coder"), coder)
+                self.assertEqual(exception.kwargs.get("show_announcements"), False)
+                self.assertIsNone(exception.kwargs.get("placeholder"))
 
     def test_cmd_reasoning_effort(self):
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
