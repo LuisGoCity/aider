@@ -8,6 +8,7 @@ class PlanStep:
     description: str
     index: int
 
+
 class PlanExecutor:
     def __init__(self, coder, io):
         self.coder = coder
@@ -68,4 +69,4 @@ class PlanExecutor:
             # Use the coder's run method to process this step
             self.coder.run(prompt)
             
-        self.io.tool_output("\n✅ Plan execution completed!")
+        self.io.tool_output("\nPlan execution completed!")
