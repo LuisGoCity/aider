@@ -1620,6 +1620,48 @@ class TestCommands(TestCase):
             finally:
                 # Clean up: remove the test file from the home directory
                 test_file.unlink()
+                
+    def test_completions_raw_code_from_plan(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=False)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create test plan files
+            plan_file1 = Path(repo_dir) / "test_plan1.md"
+            plan_file1.write_text("# Test Plan 1")
+            
+            plan_file2 = Path(repo_dir) / "test_plan2.md"
+            plan_file2.write_text("# Test Plan 2")
+            
+            # Create a subdirectory with a plan file
+            subdir = Path(repo_dir) / "subdir"
+            subdir.mkdir()
+            plan_file3 = subdir / "test_plan3.md"
+            plan_file3.write_text("# Test Plan 3")
+            
+            # Mock Document and CompleteEvent for testing completions
+            from prompt_toolkit.document import Document
+            from prompt_toolkit.completion import CompleteEvent
+            
+            # Test with empty input
+            document = Document("/code-from-plan ", cursor_position=15)
+            complete_event = CompleteEvent()
+            
+            # Use PathCompleter to get expected completions
+            with mock.patch("aider.commands.PathCompleter") as mock_path_completer:
+                # Setup the mock
+                mock_completer_instance = mock.MagicMock()
+                mock_path_completer.return_value = mock_completer_instance
+                
+                # Call the function
+                list(commands.completions_raw_code_from_plan(document, complete_event))
+                
+                # Verify PathCompleter was called with the correct arguments
+                mock_path_completer.assert_called_once()
+                
+                # Verify get_completions was called on the PathCompleter instance
+                mock_completer_instance.get_completions.assert_called_once()
 
     def test_cmd_diff(self):
         with GitTemporaryDirectory() as repo_dir:
@@ -1979,6 +2021,66 @@ class TestCommands(TestCase):
         with mock.patch.object(io, "tool_output") as mock_tool_output:
             commands.cmd_reasoning_effort("")
             mock_tool_output.assert_any_call("Current reasoning effort: high")
+            
+    def test_cmd_code_from_plan(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create a test plan file
+            plan_file = Path(repo_dir) / "test_plan.md"
+            plan_content = """# Test Plan
+            
+## Step 1
+- Create a function to add two numbers
+
+## Step 2
+- Create a function to subtract two numbers
+"""
+            plan_file.write_text(plan_content)
+            
+            # Test with no arguments
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                commands.cmd_code_from_plan("")
+                mock_tool_error.assert_called_once_with("Please provide a path to a Markdown plan file")
+            
+            # Test with non-existent file
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                commands.cmd_code_from_plan("nonexistent_plan.md")
+                mock_tool_error.assert_called_once_with("Plan file not found: nonexistent_plan.md")
+            
+            # Test with valid file
+            with (
+                mock.patch.object(commands, "cmd_add") as mock_cmd_add,
+                mock.patch.object(io, "tool_output") as mock_tool_output,
+                mock.patch("aider.coders.base_coder.Coder.create") as mock_create_coder,
+                mock.patch("aider.coders.base_coder.Coder.run") as mock_run,
+                mock.patch.object(io, "auto_confirm_ask", return_value=True) as mock_confirm,
+                mock.patch.object(io, "confirm_ask", mock_confirm)
+            ):
+                # Mock the response from the number_of_steps_worker
+                mock_run.return_value = "2"
+                
+                # Call the function
+                commands.cmd_code_from_plan(str(plan_file))
+                
+                # Verify the plan file was added to the chat
+                mock_cmd_add.assert_called_once_with(str(plan_file))
+                
+                # Verify the tool output messages
+                mock_tool_output.assert_any_call("Analyzing the plan to determine the number of steps...")
+                mock_tool_output.assert_any_call("Found 2 steps in the plan.")
+                mock_tool_output.assert_any_call("\nPlan execution completed!")
+                
+                # Verify the coder was created twice (once for step count, once for each step)
+                self.assertEqual(mock_create_coder.call_count, 3)
+                
+                # Verify run was called with the correct prompts
+                mock_run.assert_any_call(
+                    "How many steps are in the plan? Please return only an integer corresponding to"
+                    " the number of steps."
+                )
 
     def test_drop_with_original_read_only_files(self):
         with GitTemporaryDirectory() as repo_dir:
@@ -2075,6 +2177,46 @@ class TestCommands(TestCase):
             # Verify that all files are dropped
             self.assertEqual(len(coder.abs_fnames), 0)
             self.assertEqual(len(coder.abs_read_only_fnames), 0)
+            
+    def test_cmd_code_from_plan_error_handling(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create a test plan file
+            plan_file = Path(repo_dir) / "test_plan.md"
+            plan_content = "# Test Plan with unclear steps"
+            plan_file.write_text(plan_content)
+            
+            # Test with invalid step count response
+            with (
+                mock.patch.object(commands, "cmd_add") as mock_cmd_add,
+                mock.patch.object(io, "tool_output") as mock_tool_output,
+                mock.patch("aider.coders.base_coder.Coder.create") as mock_create_coder,
+                mock.patch("aider.coders.base_coder.Coder.run") as mock_run,
+                mock.patch.object(commands, "cmd_code") as mock_cmd_code,
+                mock.patch.object(io, "auto_confirm_ask", return_value=True) as mock_confirm,
+                mock.patch.object(io, "confirm_ask", mock_confirm)
+            ):
+                # Mock the response from the number_of_steps_worker to be invalid
+                mock_run.return_value = "I can't determine the number of steps"
+                
+                # Call the function
+                commands.cmd_code_from_plan(str(plan_file))
+                
+                # Verify the plan file was added to the chat
+                mock_cmd_add.assert_called_once_with(str(plan_file))
+                
+                # Verify the fallback message was shown
+                mock_tool_output.assert_any_call(
+                    "Unable to determine number of steps. Will try to solve them all at once."
+                )
+                
+                # Verify the cmd_code was called with the correct prompt
+                mock_cmd_code.assert_called_once_with(
+                    f"Please, implement the plan in the {Path(plan_file).name} file step by step."
+                )
 
     def test_cmd_load_with_switch_coder(self):
         with GitTemporaryDirectory() as repo_dir:
