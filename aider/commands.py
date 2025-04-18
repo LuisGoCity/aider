@@ -1592,25 +1592,6 @@ class Commands:
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
 
-    def step_coder_run(self, prompt, plan_path):
-        from aider.coders.base_coder import Coder
-
-        step_coder = Coder.create(
-            io=self.io,
-            from_coder=self.coder,
-            edit_format=self.coder.main_model.edit_format,
-            summarize_from_coder=True,
-        )
-        step_coder.run(prompt)
-        self.coder = step_coder
-        files2drop = [
-            added_file
-            for added_file in self.coder.get_inchat_relative_files()
-            if added_file != Path(plan_path).name
-        ]
-        self.io.tool_output(f"Dropping files in chat: {files2drop}")
-        self.cmd_drop(" ".join(files2drop))
-
     def cmd_code_from_plan(self, args):
         "Execute a coding plan from a Markdown file step by step"
         if not args.strip():
