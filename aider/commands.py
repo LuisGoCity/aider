@@ -1622,7 +1622,6 @@ class Commands:
             return
 
         # First add the plan file to context using the existing add command
-        self.io.tool_output(f"Loading plan from path: {plan_path}")
         self.cmd_add(plan_path)
 
         # Ask the model to determine how many steps are in the plan
@@ -1645,7 +1644,6 @@ class Commands:
         )
 
         # change confirm_ask function to automatically say yes/no to specific commands.
-        self.io.tool_output("Changing confirm_ask method to automatically approve edits")
         original_confirm_ask = self.io.confirm_ask
         self.io.confirm_ask = self.io.auto_confirm_ask
 
