@@ -1597,6 +1597,9 @@ class Commands:
             " the number of steps."
         )
 
+        # Log that we're changing the confirm_ask method
+        self.io.tool_output("Changing confirm_ask method to automatically approve edits")
+
         original_confirm_ask = self.io.confirm_ask
 
         self.io.confirm_ask = self.io.auto_confirm_ask
