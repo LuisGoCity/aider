@@ -1560,46 +1560,6 @@ class Commands:
         # Output announcements
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
-        
-    def test_cmd_code_from_plan_error_handling(self):
-        with GitTemporaryDirectory() as repo_dir:
-            io = InputOutput(pretty=False, fancy_input=False, yes=True)
-            coder = Coder.create(self.GPT35, None, io)
-            commands = Commands(io, coder)
-            
-            # Create a test plan file
-            plan_file = Path(repo_dir) / "test_plan.md"
-            plan_content = "# Test Plan with unclear steps"
-            plan_file.write_text(plan_content)
-            
-            # Test with invalid step count response
-            with (
-                mock.patch.object(commands, "cmd_add") as mock_cmd_add,
-                mock.patch.object(io, "tool_output") as mock_tool_output,
-                mock.patch("aider.coders.base_coder.Coder.create") as mock_create_coder,
-                mock.patch("aider.coders.base_coder.Coder.run") as mock_run,
-                mock.patch.object(commands, "cmd_code") as mock_cmd_code,
-                mock.patch.object(io, "auto_confirm_ask", return_value=True) as mock_confirm,
-                mock.patch.object(io, "confirm_ask", mock_confirm)
-            ):
-                # Mock the response from the number_of_steps_worker to be invalid
-                mock_run.return_value = "I can't determine the number of steps"
-                
-                # Call the function
-                commands.cmd_code_from_plan(str(plan_file))
-                
-                # Verify the plan file was added to the chat
-                mock_cmd_add.assert_called_once_with(str(plan_file))
-                
-                # Verify the fallback message was shown
-                mock_tool_output.assert_any_call(
-                    "Unable to determine number of steps. Will try to solve them all at once."
-                )
-                
-                # Verify the cmd_code was called with the correct prompt
-                mock_cmd_code.assert_called_once_with(
-                    f"Please, implement the plan in the {Path(plan_file).name} file step by step."
-                )
 
     def cmd_code_from_plan(self, args):
         "Execute a coding plan from a Markdown file step by step"
@@ -1643,9 +1603,9 @@ class Commands:
             for i in range(1, step_count + 1):
                 self.io.tool_output(f"Implementing step {i}")
                 prompt = (
-                    f"Implement setp {i} of the plan in in the .md file"
-                    f" {Path(plan_path).name}. Add any files, you "
-                    "require to implement this step, to this chat."
+                    f"Implement only step {i} of the plan in in the .md file"
+                    f" {Path(plan_path).name}. Add any files, you require to implement this step,"
+                    f" to this chat. Once step {i} is implemented, stop execution."
                 )
                 step_coder = Coder.create(
                     io=self.io,
