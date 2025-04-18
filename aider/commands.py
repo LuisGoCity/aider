@@ -1575,12 +1575,28 @@ class Commands:
         # First add the plan file to context using the existing add command
         self.cmd_add(plan_path)
         
-        # Create a PlanExecutor and run it
-        from aider.plan_executor import PlanExecutor
-        executor = PlanExecutor(self.coder, self.io)
+        # Ask the model to determine how many steps are in the plan
+        self.io.tool_output("Analyzing the plan to determine the number of steps...")
         
-        # Get the number of steps in the plan
-        step_count = executor.get_step_count(plan_path)
+        # Create a temporary coder to handle this question
+        from aider.coders.base_coder import Coder
+        temp_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format="ask",
+            summarize_from_coder=False,
+        )
+        
+        # Use the ask command to get the step count
+        response = temp_coder.run("How many steps are in the plan? Please respond with just a number.", with_message=True)
+        
+        # Extract the number from the response
+        step_count = 0
+        if response:
+            # Look for a number in the response
+            match = re.search(r'\b(\d+)\b', response)
+            if match:
+                step_count = int(match.group(1))
         
         if step_count <= 0:
             self.io.tool_error("Could not determine the number of steps in the plan.")
