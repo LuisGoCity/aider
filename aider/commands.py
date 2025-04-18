@@ -1653,6 +1653,7 @@ class Commands:
         try:
             step_count = int(response)
             self.io.tool_output(f"Found {step_count} steps in the plan.")
+            raise ValueError("raising to test")
         except ValueError:
             self.io.tool_output(
                 "Unable to determine number of steps. Will try to solve them all at once."
