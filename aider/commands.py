@@ -1422,7 +1422,7 @@ class Commands:
 
     def completions_raw_save(self, document, complete_event):
         return self.completions_raw_read_only(document, complete_event)
-        
+
     def completions_raw_code_from_plan(self, document, complete_event):
         return self.completions_raw_read_only(document, complete_event)
 
@@ -1560,66 +1560,60 @@ class Commands:
         # Output announcements
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
-        
+
     def cmd_code_from_plan(self, args):
         "Execute a coding plan from a Markdown file step by step"
         if not args.strip():
             self.io.tool_error("Please provide a path to a Markdown plan file")
             return
 
-        plan_path = args.strip()
+        plan_path = Path(args.strip())
         if not os.path.exists(plan_path):
             self.io.tool_error(f"Plan file not found: {plan_path}")
             return
-        
+
         # First add the plan file to context using the existing add command
         self.cmd_add(plan_path)
-        
+
         # Ask the model to determine how many steps are in the plan
         self.io.tool_output("Analyzing the plan to determine the number of steps...")
-        
+
         # Create a temporary coder to handle this question
         from aider.coders.base_coder import Coder
+
         temp_coder = Coder.create(
             io=self.io,
             from_coder=self.coder,
             edit_format="ask",
             summarize_from_coder=False,
         )
-        
+
         # Use the ask command to get the step count
-        response = temp_coder.run("How many steps are in the plan? Please respond with just a number.", with_message=True)
-        
+        response = temp_coder.run(
+            (
+                "How many steps are in the plan? Please return only an integer corresponding to"
+                " the number of steps."
+            ),
+            with_message=True,
+        )
+
         # Extract the number from the response
-        step_count = 0
-        if response:
-            # Look for a number in the response
-            match = re.search(r'\b(\d+)\b', response)
-            if match:
-                step_count = int(match.group(1))
-        
-        if step_count <= 0:
-            self.io.tool_error("Could not determine the number of steps in the plan.")
-            return
-            
-        self.io.tool_output(f"Found {step_count} steps in the plan.")
-        
-        # Execute each step one by one
-        for i in range(1, step_count + 1):
-            self.io.tool_output(f"\n[{i}/{step_count}] Executing step {i}")
-            
-            # Confirm before executing each step
-            if i > 1 and not self.io.confirm_ask(f"Continue with step {i}?"):
-                self.io.tool_output("Plan execution paused. Use /code-from-plan to resume.")
-                return
-                
-            # Execute the step by sending it to the LLM
-            prompt = f"I'm implementing a plan step by step. Please help me with step {i} from the plan. Implement just this step now."
-            
-            # Use the coder's run method to process this step
-            self.coder.run(prompt)
-            
-        self.io.tool_output("\n✅ Plan execution completed!")
+        try:
+            step_count = int(response)
+            self.io.tool_output(f"Found {step_count} steps in the plan.")
+            for i in range(1, step_count + 1):
+                prompt = (
+                    f"Implement setp {i} of the plan in in the .md file called: {plan_path.name}"
+                )
+                self.cmd_code(prompt)
+        except Exception:
+            self.io.tool_output(
+                "Unable to determine number of steps. Will try to solve them all at once."
+            )
+            prompt = f"Please, implement the plan in the {plan_path.name} file step by step."
+            self.cmd_code(prompt)
+
+        self.io.tool_output("\nPlan execution completed!")
 
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
