@@ -1623,6 +1623,7 @@ class Commands:
             return
 
         # First add the plan file to context using the existing add command
+        self.io.tool_output(f"Loading plan from: {plan_path}")
         self.cmd_add(plan_path)
 
         # Ask the model to determine how many steps are in the plan
