@@ -2186,6 +2186,97 @@ class TestCommands(TestCase):
             
             completions = list(commands.completions_raw_code_from_plan(document4, complete_event))
             self.assertEqual(len(completions), 0)
+            
+    def test_run_new_coder(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create test files
+            test_file = Path(repo_dir) / "test_file.py"
+            test_file.write_text("def hello():\n    return 'Hello, World!'\n")
+            
+            # Add the file to the chat
+            commands.cmd_add(str(test_file))
+            
+            # Set up mocks
+            with (
+                mock.patch("aider.coders.base_coder.Coder.create") as mock_create,
+                mock.patch.object(io, "tool_output") as mock_tool_output,
+                mock.patch.object(commands, "cmd_drop") as mock_cmd_drop,
+            ):
+                # Create a mock coder instance
+                mock_coder = mock.MagicMock()
+                mock_coder.get_inchat_relative_files.return_value = ["test_file.py", "new_file.py"]
+                mock_create.return_value = mock_coder
+                
+                # Test _run_new_coder with basic parameters
+                prompt = "Implement a new function"
+                exclude_from_drop = ["test_file.py"]
+                summarize_from_coder = True
+                
+                # Call the method
+                commands._run_new_coder(prompt, exclude_from_drop, summarize_from_coder)
+                
+                # Verify Coder.create was called with correct parameters
+                mock_create.assert_called_once()
+                create_args = mock_create.call_args
+                self.assertEqual(create_args[1]["io"], io)
+                self.assertEqual(create_args[1]["from_coder"], coder)
+                self.assertEqual(create_args[1]["edit_format"], coder.main_model.edit_format)
+                self.assertEqual(create_args[1]["summarize_from_coder"], summarize_from_coder)
+                
+                # Verify the coder.run was called with the prompt
+                mock_coder.run.assert_called_once_with(prompt)
+                
+                # Verify that cmd_drop was called with the correct files
+                # (files in chat minus excluded files)
+                mock_cmd_drop.assert_called_once_with("new_file.py")
+                
+                # Verify that tool_output was called to inform about dropped files
+                mock_tool_output.assert_any_call("Dropping files in chat: ['new_file.py']")
+                
+                # Verify that the coder instance was updated
+                self.assertEqual(commands.coder, mock_coder)
+    
+    def test_run_new_coder_with_exception(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Set up mocks
+            with (
+                mock.patch("aider.coders.base_coder.Coder.create") as mock_create,
+                mock.patch.object(io, "tool_output") as mock_tool_output,
+                mock.patch.object(commands, "cmd_drop") as mock_cmd_drop,
+            ):
+                # Create a mock coder instance that raises an exception during run
+                mock_coder = mock.MagicMock()
+                mock_coder.run.side_effect = Exception("Test exception")
+                mock_create.return_value = mock_coder
+                
+                # Test _run_new_coder with an exception during run
+                prompt = "Implement a new function"
+                exclude_from_drop = []
+                summarize_from_coder = False
+                
+                # Call the method - it should handle the exception
+                with self.assertRaises(Exception) as context:
+                    commands._run_new_coder(prompt, exclude_from_drop, summarize_from_coder)
+                
+                # Verify the exception was raised
+                self.assertEqual(str(context.exception), "Test exception")
+                
+                # Verify Coder.create was called
+                mock_create.assert_called_once()
+                
+                # Verify the coder.run was called with the prompt
+                mock_coder.run.assert_called_once_with(prompt)
+                
+                # Verify that cmd_drop was not called since an exception occurred
+                mock_cmd_drop.assert_not_called()
 
     def test_cmd_reasoning_effort(self):
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
