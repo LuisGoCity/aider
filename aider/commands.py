@@ -1572,9 +1572,6 @@ class Commands:
             self.io.tool_error(f"Plan file not found: {plan_path}")
             return
 
-        # Log the path of the plan file
-        self.io.tool_output(f"Loading plan from file: {plan_path}")
-
         # First add the plan file to context using the existing add command
         self.cmd_add(plan_path)
 
@@ -1596,10 +1593,7 @@ class Commands:
             "How many steps are in the plan? Please return only an integer corresponding to"
             " the number of steps."
         )
-        
-        # Log that we're changing the confirm_ask method
-        self.io.tool_output("Temporarily disabling confirmation prompts during plan execution")
-        
+
         original_confirm_ask = self.io.confirm_ask
 
         self.io.confirm_ask = self.io.auto_confirm_ask
@@ -1622,6 +1616,8 @@ class Commands:
                 )
                 step_coder.run(prompt)
                 self.coder = step_coder
+                added_files = self.coder.get_inchat_relative_files()
+                self.io.tool_output(f"Dropping files in chat: {added_files}")
                 self.cmd_drop()
 
         except Exception:
