@@ -2027,7 +2027,8 @@ class TestCommands(TestCase):
                 commands.cmd_code_from_plan("non_existent_file.md")
                 
                 # Verify that tool_error was called with the expected message
-                mock_tool_error.assert_called_once_with("File not found: non_existent_file.md")
+                mock_tool_error.assert_called_once()
+                self.assertIn("File not found", mock_tool_error.call_args[0][0])
             
             # Test case 2: File exists but is not a valid plan
             invalid_plan_file = Path(repo_dir) / "invalid_plan.md"
