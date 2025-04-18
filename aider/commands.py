@@ -445,6 +445,7 @@ class Commands:
 
     def _from_plan_exist_strategy(self, original_confirmation_ask_method):
         self.io.confirm_ask = original_confirmation_ask_method
+        self.io.tool_output("\nPlan execution completed!")
         raise SwitchCoder(
             edit_format=self.coder.edit_format,
             summarize_from_coder=False,
@@ -1682,7 +1683,6 @@ class Commands:
                     f" to this chat. Once step {j} is implemented, stop execution."
                 )
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
-        self.io.tool_output("\nPlan execution completed!")
         self._from_plan_exist_strategy(original_confirm_ask)
 
     def cmd_copy_context(self, args=None):
