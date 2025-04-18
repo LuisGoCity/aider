@@ -10,6 +10,8 @@ from unittest import TestCase, mock
 
 import git
 import pyperclip
+from prompt_toolkit.completion import Completion
+from prompt_toolkit.document import Document
 
 from aider.coders import Coder
 from aider.commands import Commands, SwitchCoder
@@ -1953,6 +1955,318 @@ class TestCommands(TestCase):
             self.assertEqual(len(coder.abs_read_only_fnames), 0)
             self.assertEqual(len(coder.cur_messages), 0)
             self.assertEqual(len(coder.done_messages), 0)
+
+    def test_cmd_code_from_plan_positive(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Create a test plan file
+            plan_file = Path(repo_dir) / "test_plan.md"
+            plan_content = """# Test Plan
+## Step 1
+- Create a function that adds two numbers
+## Step 2
+- Create a function that multiplies two numbers
+"""
+            plan_file.write_text(plan_content)
+            # Mock the necessary methods
+            with (
+                mock.patch.object(commands, "_run_new_coder") as mock_run_new_coder,
+                mock.patch.object(
+                    commands, "_from_plan_exist_strategy"
+                ) as mock_from_plan_exist_strategy,
+                mock.patch.object(io, "tool_output") as mock_tool_output,
+            ):
+                # Mock the coder.run method to return a step count
+                mock_run_instance = mock.MagicMock()
+                mock_run_instance.run.return_value = "2"
+
+                with mock.patch(
+                    "aider.coders.base_coder.Coder.create", return_value=mock_run_instance
+                ):
+                    # Execute the command
+                    commands.cmd_code_from_plan(str(plan_file))
+
+                    # Verify that the plan file was added to the chat
+                    mock_run_instance.run.assert_called_once()
+
+                    # Verify that _run_new_coder was called twice (once for each step)
+                    self.assertEqual(mock_run_new_coder.call_count, 2)
+
+                    # Verify the arguments for the first call to _run_new_coder
+                    first_call_args = mock_run_new_coder.call_args_list[0][0]
+                    self.assertIn("step 1", first_call_args[0].lower())
+                    self.assertEqual(first_call_args[1], ["test_plan.md"])
+                    self.assertFalse(first_call_args[2])
+
+                    # Verify the arguments for the second call to _run_new_coder
+                    second_call_args = mock_run_new_coder.call_args_list[1][0]
+                    self.assertIn("step 2", second_call_args[0].lower())
+                    self.assertEqual(second_call_args[1], ["test_plan.md"])
+                    self.assertFalse(second_call_args[2])
+
+                    # Verify that _from_plan_exist_strategy was called once
+                    mock_from_plan_exist_strategy.assert_called_once()
+
+                    # Verify that tool_output was called with the expected messages
+                    mock_tool_output.assert_any_call("Found 2 steps in the plan.")
+                    mock_tool_output.assert_any_call("Implementing step 1")
+                    mock_tool_output.assert_any_call("Implementing step 2")
+
+    def test_cmd_code_from_plan_error_handling(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Test case 1: File not found
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Execute the command with a non-existent file
+                commands.cmd_code_from_plan("non_existent_file.md")
+
+                # Verify that tool_error was called with the expected message
+                mock_tool_error.assert_called_once()
+                self.assertIn("Plan file not found", mock_tool_error.call_args[0][0])
+
+            # Test case 2: File exists but is not a valid plan
+            invalid_plan_file = Path(repo_dir) / "invalid_plan.md"
+            invalid_plan_file.write_text("This is not a valid plan file.")
+
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Mock the coder.run method to raise ValueError
+                mock_run_instance = mock.MagicMock()
+                mock_run_instance.run.side_effect = ValueError(
+                    "Could not determine the number of steps"
+                )
+
+                with mock.patch(
+                    "aider.coders.base_coder.Coder.create", return_value=mock_run_instance
+                ):
+                    # Execute the command with an invalid plan file and expect ValueError
+                    with self.assertRaises(ValueError):
+                        commands.cmd_code_from_plan(str(invalid_plan_file))
+
+    def test_completions_raw_code_from_plan_positive(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Create test files for completion
+            plan_file = Path(repo_dir) / "test_plan.md"
+            plan_file.write_text("# Test Plan\n\n## Step 1\n- Create a function\n")
+
+            # Create a document with partial command text
+            document = Document("/code-from-plan test", cursor_position=16)
+
+            # Create a mock completion event
+            complete_event = mock.MagicMock()
+
+            # Test the completions_raw_code_from_plan method
+            with mock.patch.object(commands, "completions_raw_read_only") as mock_completions:
+                # Set up the mock to return some completions
+                mock_completions.return_value = [
+                    Completion(text="test_plan.md", start_position=-4, display="test_plan.md")
+                ]
+
+                # Call the method
+                completions = list(
+                    commands.completions_raw_code_from_plan(document, complete_event)
+                )
+
+                # Verify that completions_raw_read_only was called with the correct arguments
+                mock_completions.assert_called_once()
+                self.assertEqual(mock_completions.call_args[0][0], document)
+                self.assertEqual(mock_completions.call_args[0][1], complete_event)
+
+                # Verify that the completions were returned correctly
+                self.assertEqual(len(completions), 1)
+                self.assertEqual(completions[0].text, "test_plan.md")
+                self.assertEqual(completions[0].start_position, -4)
+
+            # Test with different document text
+            document2 = Document("/code-from-plan ", cursor_position=15)
+
+            with mock.patch.object(commands, "completions_raw_read_only") as mock_completions:
+                # Set up the mock to return some completions
+                mock_completions.return_value = [
+                    Completion(text="test_plan.md", start_position=0, display="test_plan.md")
+                ]
+
+                # Call the method
+                completions = list(
+                    commands.completions_raw_code_from_plan(document2, complete_event)
+                )
+
+                # Verify that completions_raw_read_only was called with the correct arguments
+                mock_completions.assert_called_once()
+                self.assertEqual(mock_completions.call_args[0][0], document2)
+                self.assertEqual(mock_completions.call_args[0][1], complete_event)
+
+                # Verify that the completions were returned correctly
+                self.assertEqual(len(completions), 1)
+                self.assertEqual(completions[0].text, "test_plan.md")
+                self.assertEqual(completions[0].start_position, 0)
+
+    def test_completions_raw_code_from_plan_error_handling(self):
+        with GitTemporaryDirectory() as repo_dir:
+            repo_dir = repo_dir
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Test case 1: Invalid command format (no space after command)
+            document1 = Document("/code-from-plan", cursor_position=15)
+            complete_event = mock.MagicMock()
+
+            # The function should return an empty list when the command format is invalid
+            completions = list(commands.completions_raw_code_from_plan(document1, complete_event))
+            self.assertEqual(len(completions), 0)
+
+            # Test case 2: completions_raw_read_only returns empty list
+            document2 = Document("/code-from-plan ", cursor_position=16)
+
+            with mock.patch.object(
+                commands, "completions_raw_read_only", return_value=[]
+            ) as mock_completions:
+                completions = list(
+                    commands.completions_raw_code_from_plan(document2, complete_event)
+                )
+
+                # Verify that completions_raw_read_only was called
+                mock_completions.assert_called_once()
+
+                # Verify that an empty list is returned
+                self.assertEqual(len(completions), 0)
+
+    def test_run_new_coder(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Create test files
+            test_file = Path(repo_dir) / "test_file.py"
+            test_file.write_text("def hello():\n    return 'Hello, World!'\n")
+
+            # Add the file to the chat
+            commands.cmd_add(str(test_file))
+
+            # Set up mocks
+            with (
+                mock.patch("aider.coders.base_coder.Coder.create") as mock_create,
+                mock.patch.object(io, "tool_output") as mock_tool_output,
+                mock.patch.object(commands, "cmd_drop") as mock_cmd_drop,
+            ):
+                # Create a mock coder instance
+                mock_coder = mock.MagicMock()
+                mock_coder.get_inchat_relative_files.return_value = ["test_file.py", "new_file.py"]
+                mock_create.return_value = mock_coder
+
+                # Test _run_new_coder with basic parameters
+                prompt = "Implement a new function"
+                exclude_from_drop = ["test_file.py"]
+                summarize_from_coder = True
+
+                # Call the method
+                commands._run_new_coder(prompt, exclude_from_drop, summarize_from_coder)
+
+                # Verify Coder.create was called with correct parameters
+                mock_create.assert_called_once()
+                create_args = mock_create.call_args
+                self.assertEqual(create_args[1]["io"], io)
+                self.assertEqual(create_args[1]["from_coder"], coder)
+                self.assertEqual(create_args[1]["edit_format"], coder.main_model.edit_format)
+                self.assertEqual(create_args[1]["summarize_from_coder"], summarize_from_coder)
+
+                # Verify the coder.run was called with the prompt
+                mock_coder.run.assert_called_once_with(prompt)
+
+                # Verify that cmd_drop was called with the correct files
+                # (files in chat minus excluded files)
+                mock_cmd_drop.assert_called_once_with("new_file.py")
+
+                # Verify that tool_output was called to inform about dropped files
+                mock_tool_output.assert_any_call("Dropping files in chat: ['new_file.py']")
+
+                # Verify that the coder instance was updated
+                self.assertEqual(commands.coder, mock_coder)
+
+    def test_run_new_coder_with_exception(self):
+        with GitTemporaryDirectory() as repo_dir:
+            repo_dir = repo_dir
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Set up mocks
+            with (
+                mock.patch("aider.coders.base_coder.Coder.create") as mock_create,
+                mock.patch.object(commands, "cmd_drop") as mock_cmd_drop,
+            ):
+                # Create a mock coder instance that raises an exception during run
+                mock_coder = mock.MagicMock()
+                mock_coder.run.side_effect = Exception("Test exception")
+                mock_create.return_value = mock_coder
+
+                # Test _run_new_coder with an exception during run
+                prompt = "Implement a new function"
+                exclude_from_drop = []
+                summarize_from_coder = False
+
+                # Call the method - it should handle the exception
+                with self.assertRaises(Exception) as context:
+                    commands._run_new_coder(prompt, exclude_from_drop, summarize_from_coder)
+
+                # Verify the exception was raised
+                self.assertEqual(str(context.exception), "Test exception")
+
+                # Verify Coder.create was called
+                mock_create.assert_called_once()
+
+                # Verify the coder.run was called with the prompt
+                mock_coder.run.assert_called_once_with(prompt)
+
+                # Verify that cmd_drop was not called since an exception occurred
+                mock_cmd_drop.assert_not_called()
+
+    def test_from_plan_exist_strategy(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Create a test file
+            test_file = Path(repo_dir) / "test_file.py"
+            test_file.write_text("def hello():\n    return 'Hello, World!'\n")
+
+            # Add the file to the chat
+            commands.cmd_add(str(test_file))
+
+            # Create a mock for the original_confirmation_ask_method
+            original_confirm_ask = mock.MagicMock()
+
+            # Mock tool_output to verify completion message
+            with mock.patch.object(io, "tool_output") as mock_tool_output:
+                # Test that SwitchCoder is raised with the correct parameters
+                with self.assertRaises(SwitchCoder) as context:
+                    commands._from_plan_exist_strategy(original_confirm_ask)
+
+                # Verify that the completion message was shown
+                mock_tool_output.assert_called_with("\nPlan execution completed!")
+
+                # Verify that the io.confirm_ask was restored to the original method
+                self.assertEqual(io.confirm_ask, original_confirm_ask)
+
+                # Verify the SwitchCoder exception contains the correct parameters
+                exception = context.exception
+                self.assertEqual(exception.kwargs.get("edit_format"), coder.edit_format)
+                self.assertEqual(exception.kwargs.get("summarize_from_coder"), False)
+                self.assertEqual(exception.kwargs.get("from_coder"), coder)
+                self.assertEqual(exception.kwargs.get("show_announcements"), False)
+                self.assertIsNone(exception.kwargs.get("placeholder"))
 
     def test_cmd_reasoning_effort(self):
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
