@@ -793,6 +793,38 @@ class InputOutput:
         return False
 
     @restore_multiline
+    def auto_confirm_ask(
+        self,
+        question,
+        default="y",
+        subject=None,
+        explicit_yes_required=False,
+        group=None,
+        allow_never=False,
+    ):
+        """
+        Auto-say yes to adding files to context
+        Auto-say no to running shell commands
+        For everything else, use the original confirm_ask method
+        """
+        # Auto-say yes to adding files to context
+        if "Add file to the chat?" in question:
+            return True
+
+        # Auto-say no to running shell commands
+        if "Run shell command?" in question:
+            return False
+
+        # For everything else, use the original confirm_ask method
+        return self.confirm_ask(
+            question,
+            default=default,
+            subject=subject,
+            explicit_yes_required=explicit_yes_required,
+            group=group,
+            allow_never=allow_never,
+        )
+
     def confirm_ask(
         self,
         question,
