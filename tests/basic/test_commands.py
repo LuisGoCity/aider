@@ -2161,6 +2161,9 @@ class TestCommands(TestCase):
                 # Verify that the exception was actually raised and handled
                 mock_completions.assert_called_with(document3, complete_event)
 
+                # Verify that the exception was actually raised and handled
+                mock_completions.assert_called_with(document3, complete_event)
+
             # Test case 4: Command text doesn't match expected pattern
             document4 = Document("/some-other-command ", cursor_position=18)
 
