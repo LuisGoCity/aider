@@ -423,6 +423,36 @@ class Commands:
         self.coder.done_messages = []
         self.coder.cur_messages = []
 
+    def _run_new_coder(self, prompt, exclude_from_drop, summarize_from_coder):
+        "Utility function to create a new coder that will clear context upon finishing"
+        from aider.coders.base_coder import Coder
+
+        step_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format=self.coder.main_model.edit_format,
+            summarize_from_coder=summarize_from_coder,
+        )
+        step_coder.run(prompt)
+        self.coder = step_coder
+        files2drop = [
+            added_file
+            for added_file in self.coder.get_inchat_relative_files()
+            if added_file not in exclude_from_drop
+        ]
+        self.io.tool_output(f"Dropping files in chat: {files2drop}")
+        self.cmd_drop(" ".join(files2drop))
+
+    def _from_plan_exist_strategy(self, original_confirmation_ask_method):
+        self.io.confirm_ask = original_confirmation_ask_method
+        raise SwitchCoder(
+            edit_format=self.coder.edit_format,
+            summarize_from_coder=False,
+            from_coder=self.coder,
+            show_announcements=False,
+            placeholder=None,
+        )
+
     def cmd_reset(self, args):
         "Drop all files and clear the chat history"
         self._drop_all_files()
@@ -1561,6 +1591,25 @@ class Commands:
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
 
+    def step_coder_run(self, prompt, plan_path):
+        from aider.coders.base_coder import Coder
+
+        step_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format=self.coder.main_model.edit_format,
+            summarize_from_coder=True,
+        )
+        step_coder.run(prompt)
+        self.coder = step_coder
+        files2drop = [
+            added_file
+            for added_file in self.coder.get_inchat_relative_files()
+            if added_file != Path(plan_path).name
+        ]
+        self.io.tool_output(f"Dropping files in chat: {files2drop}")
+        self.cmd_drop(" ".join(files2drop))
+
     def cmd_code_from_plan(self, args):
         "Execute a coding plan from a Markdown file step by step"
         if not args.strip():
@@ -1571,9 +1620,6 @@ class Commands:
         if not os.path.exists(plan_path):
             self.io.tool_error(f"Plan file not found: {plan_path}")
             return
-
-        # Log the path of the file that will be loaded
-        self.io.tool_output(f"Loading plan from: {plan_path}")
 
         # First add the plan file to context using the existing add command
         self.cmd_add(plan_path)
@@ -1597,40 +1643,15 @@ class Commands:
             " the number of steps."
         )
 
-        # Log that we're changing the confirm_ask method
-        self.io.tool_output("Changing confirm_ask method to automatically approve edits")
-
+        # change confirm_ask function to automatically say yes/no to specific commands.
         original_confirm_ask = self.io.confirm_ask
-
         self.io.confirm_ask = self.io.auto_confirm_ask
+
         # Extract the number from the response
         try:
             step_count = int(response)
             self.io.tool_output(f"Found {step_count} steps in the plan.")
-            for i in range(1, step_count + 1):
-                self.io.tool_output(f"Implementing step {i}")
-                prompt = (
-                    f"Implement only step {i} of the plan in in the .md file"
-                    f" {Path(plan_path).name}. Add any files, you require to implement this step,"
-                    f" to this chat. Once step {i} is implemented, stop execution."
-                )
-                step_coder = Coder.create(
-                    io=self.io,
-                    from_coder=self.coder,
-                    edit_format=self.coder.main_model.edit_format,
-                    summarize_from_coder=True,
-                )
-                step_coder.run(prompt)
-                self.coder = step_coder
-                files2drop = [
-                    added_file
-                    for added_file in self.coder.get_inchat_relative_files()
-                    if added_file != Path(plan_path).name
-                ]
-                self.io.tool_output(f"Dropping files in chat: {files2drop}")
-                self.cmd_drop(" ".join(files2drop))
-
-        except Exception:
+        except ValueError:
             self.io.tool_output(
                 "Unable to determine number of steps. Will try to solve them all at once."
             )
@@ -1638,18 +1659,30 @@ class Commands:
                 f"Please, implement the plan in the {Path(plan_path).name} file step by step. Add"
                 " any files, you require to implement this plan, to this chat."
             )
-            self.cmd_code(prompt)
-        finally:
-            self.io.confirm_ask = original_confirm_ask
+            self._run_new_coder(prompt, [Path(plan_path).name], False)
+            self._from_plan_exist_strategy(original_confirm_ask)
 
+        try:
+            for i in range(1, step_count + 1):
+                self.io.tool_output(f"Implementing step {i}")
+                prompt = (
+                    f"Implement only step {i} of the plan in in the .md file"
+                    f" {Path(plan_path).name}. Add any files, you require to implement this step,"
+                    f" to this chat. Once step {i} is implemented, stop execution."
+                )
+                self._run_new_coder(prompt, [Path(plan_path).name], False)
+        except Exception:
+            self.io.tool_output(f"Failed to implement step {i}, trying again.")
+            for j in range(i, step_count + 1):
+                self.io.tool_output(f"Implementing step {j}")
+                prompt = (
+                    f"Implement only step {j} of the plan in in the .md file"
+                    f" {Path(plan_path).name}. Add any files, you require to implement this step,"
+                    f" to this chat. Once step {j} is implemented, stop execution."
+                )
+                self._run_new_coder(prompt, [Path(plan_path).name], False)
         self.io.tool_output("\nPlan execution completed!")
-        raise SwitchCoder(
-            edit_format=self.coder.edit_format,
-            summarize_from_coder=False,
-            from_coder=self.coder,
-            show_announcements=False,
-            placeholder=None,
-        )
+        self._from_plan_exist_strategy(original_confirm_ask)
 
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
