@@ -1666,21 +1666,13 @@ class Commands:
         try:
             for i in range(1, step_count + 1):
                 self.io.tool_output(f"Implementing step {i}")
-                prompt = (
-                    f"Implement only step {i} of the plan in in the .md file"
-                    f" {Path(plan_path).name}. Add any files, you require to implement this step,"
-                    f" to this chat. Once step {i} is implemented, stop execution."
-                )
+                prompt = get_step_prompt(i, plan_path)
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
         except Exception:
             self.io.tool_output(f"Failed to implement step {i}, trying again.")
             for j in range(i, step_count + 1):
                 self.io.tool_output(f"Implementing step {j}")
-                prompt = (
-                    f"Implement only step {j} of the plan in in the .md file"
-                    f" {Path(plan_path).name}. Add any files, you require to implement this step,"
-                    f" to this chat. Once step {j} is implemented, stop execution."
-                )
+                prompt = get_step_prompt(i, plan_path)
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
         self._from_plan_exist_strategy(original_confirm_ask)
 
@@ -1738,6 +1730,14 @@ def expand_subdir(file_path):
         for file in file_path.rglob("*"):
             if file.is_file():
                 yield file
+
+
+def get_step_prompt(step_number, plan_path):
+    return (
+        f"Implement only step {step_number} of the plan in in the .md file"
+        f" {Path(plan_path).name}. Add any files, you require to implement this step,"
+        f" to this chat. Once step {step_number} is implemented, stop execution."
+    )
 
 
 def parse_quoted_filenames(args):
