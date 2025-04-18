@@ -1593,7 +1593,9 @@ class Commands:
             "How many steps are in the plan? Please return only an integer corresponding to"
             " the number of steps."
         )
+        original_confirm_ask = self.io.confirm_ask
 
+        self.io.confirm_ask = self.io.auto_confirm_ask
         # Extract the number from the response
         try:
             step_count = int(response)
@@ -1618,6 +1620,8 @@ class Commands:
             )
             prompt = f"Please, implement the plan in the {Path(plan_path).name} file step by step."
             self.cmd_code(prompt)
+        finally:
+            self.io.confirm_ask = original_confirm_ask
 
         self.io.tool_output("\nPlan execution completed!")
 

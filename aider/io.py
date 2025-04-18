@@ -825,6 +825,7 @@ class InputOutput:
             allow_never=allow_never,
         )
 
+    @restore_multiline
     def confirm_ask(
         self,
         question,
