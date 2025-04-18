@@ -1596,6 +1596,10 @@ class Commands:
             "How many steps are in the plan? Please return only an integer corresponding to"
             " the number of steps."
         )
+        
+        # Log that we're changing the confirm_ask method
+        self.io.tool_output("Temporarily disabling confirmation prompts during plan execution")
+        
         original_confirm_ask = self.io.confirm_ask
 
         self.io.confirm_ask = self.io.auto_confirm_ask
