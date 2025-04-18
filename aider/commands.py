@@ -1572,9 +1572,6 @@ class Commands:
             self.io.tool_error(f"Plan file not found: {plan_path}")
             return
 
-        # Log the path from which the file will be loaded
-        self.io.tool_output(f"Loading plan from: {plan_path}")
-
         # First add the plan file to context using the existing add command
         self.cmd_add(plan_path)
 
@@ -1596,9 +1593,6 @@ class Commands:
             "How many steps are in the plan? Please return only an integer corresponding to"
             " the number of steps."
         )
-
-        # Log that we're changing the confirm_ask method
-        self.io.tool_output("Changing confirm_ask method to automatically approve edits from plan")
 
         original_confirm_ask = self.io.confirm_ask
 
