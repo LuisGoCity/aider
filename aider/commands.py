@@ -1422,6 +1422,9 @@ class Commands:
 
     def completions_raw_save(self, document, complete_event):
         return self.completions_raw_read_only(document, complete_event)
+        
+    def completions_raw_code_from_plan(self, document, complete_event):
+        return self.completions_raw_read_only(document, complete_event)
 
     def cmd_save(self, args):
         "Save commands to a file that can reconstruct the current chat session's files"
@@ -1557,6 +1560,22 @@ class Commands:
         # Output announcements
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
+        
+    def cmd_code_from_plan(self, args):
+        "Execute a coding plan from a Markdown file step by step"
+        if not args.strip():
+            self.io.tool_error("Please provide a path to a Markdown plan file")
+            return
+
+        plan_path = args.strip()
+        if not os.path.exists(plan_path):
+            self.io.tool_error(f"Plan file not found: {plan_path}")
+            return
+            
+        # Create a PlanExecutor and run it
+        from aider.plan_executor import PlanExecutor
+        executor = PlanExecutor(self.coder, self.io)
+        executor.execute_plan(plan_path)
 
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
