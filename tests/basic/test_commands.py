@@ -2035,8 +2035,9 @@ class TestCommands(TestCase):
             invalid_plan_file.write_text("This is not a valid plan file.")
             
             with mock.patch.object(io, "tool_error") as mock_tool_error:
-                # Execute the command with an invalid plan file
-                commands.cmd_code_from_plan(str(invalid_plan_file))
+                # Execute the command with an invalid plan file and expect ValueError
+                with self.assertRaises(ValueError):
+                    commands.cmd_code_from_plan(str(invalid_plan_file))
                 
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once()
