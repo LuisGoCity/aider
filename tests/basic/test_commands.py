@@ -1662,6 +1662,40 @@ class TestCommands(TestCase):
                 
                 # Verify get_completions was called on the PathCompleter instance
                 mock_completer_instance.get_completions.assert_called_once()
+            
+            # Test with partial input
+            document = Document("/code-from-plan test", cursor_position=20)
+            complete_event = CompleteEvent()
+            
+            # Mock the PathCompleter to return specific completions
+            with mock.patch("aider.commands.PathCompleter") as mock_path_completer:
+                mock_completer_instance = mock.MagicMock()
+                mock_path_completer.return_value = mock_completer_instance
+                
+                # Setup mock completions
+                mock_completion1 = Completion(text="test_plan1.md", start_position=0)
+                mock_completion2 = Completion(text="test_plan2.md", start_position=0)
+                mock_completer_instance.get_completions.return_value = [mock_completion1, mock_completion2]
+                
+                # Call the function and collect results
+                completions = list(commands.completions_raw_code_from_plan(document, complete_event))
+                
+                # Verify we got completions
+                self.assertTrue(len(completions) > 0)
+                
+            # Test with quoted path
+            document = Document('/code-from-plan "test', cursor_position=21)
+            complete_event = CompleteEvent()
+            
+            with mock.patch("aider.commands.PathCompleter") as mock_path_completer:
+                mock_completer_instance = mock.MagicMock()
+                mock_path_completer.return_value = mock_completer_instance
+                
+                # Call the function
+                list(commands.completions_raw_code_from_plan(document, complete_event))
+                
+                # Verify PathCompleter was called
+                mock_path_completer.assert_called_once()
 
     def test_cmd_diff(self):
         with GitTemporaryDirectory() as repo_dir:
