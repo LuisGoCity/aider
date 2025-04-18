@@ -19,12 +19,6 @@ class PlanExecutor:
         with open(plan_path, 'r', encoding=self.io.encoding, errors="replace") as f:
             content = f.read()
             
-        # First, add the file to context
-        abs_path = os.path.abspath(plan_path)
-        rel_path = self.coder.get_rel_fname(abs_path)
-        self.coder.add_rel_fname(rel_path)
-        self.io.tool_output(f"Added plan file to context: {rel_path}")
-        
         # Parse steps (assuming steps are marked by ## Step X: or similar)
         steps = []
         step_pattern = r'##\s*Step\s*(\d+):\s*(.*?)(?=##|\Z)'
@@ -47,6 +41,7 @@ class PlanExecutor:
         
     def execute_plan(self, plan_path):
         """Execute each step in the plan."""
+        # Parse the plan file
         steps = self.parse_plan(plan_path)
         
         if not steps:
@@ -69,4 +64,4 @@ class PlanExecutor:
             # Use the coder's run method to process this step
             self.coder.run(prompt)
             
-        self.io.tool_output("\nPlan execution completed!")
+        self.io.tool_output("\n✅ Plan execution completed!")

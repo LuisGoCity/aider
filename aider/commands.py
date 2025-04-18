@@ -1571,6 +1571,9 @@ class Commands:
         if not os.path.exists(plan_path):
             self.io.tool_error(f"Plan file not found: {plan_path}")
             return
+        
+        # First add the plan file to context using the existing add command
+        self.cmd_add(plan_path)
             
         # Create a PlanExecutor and run it
         from aider.plan_executor import PlanExecutor
