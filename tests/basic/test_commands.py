@@ -2079,6 +2079,66 @@ class TestCommands(TestCase):
                     mock_tool_error.assert_called_once()
                     self.assertIn("Error implementing step", mock_tool_error.call_args[0][0])
                     self.assertIn("Test exception", mock_tool_error.call_args[0][0])
+    
+    def test_completions_raw_code_from_plan_positive(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create test files for completion
+            plan_file = Path(repo_dir) / "test_plan.md"
+            plan_file.write_text("# Test Plan\n\n## Step 1\n- Create a function\n")
+            
+            # Create a document with partial command text
+            document = Document("/code-from-plan test", cursor_position=16)
+            
+            # Create a mock completion event
+            complete_event = mock.MagicMock()
+            
+            # Test the completions_raw_code_from_plan method
+            with mock.patch.object(commands, "completions_raw_read_only") as mock_completions:
+                # Set up the mock to return some completions
+                mock_completions.return_value = [
+                    Completion(text="test_plan.md", start_position=-4, display="test_plan.md")
+                ]
+                
+                # Call the method
+                completions = list(commands.completions_raw_code_from_plan(document, complete_event))
+                
+                # Verify that completions_raw_read_only was called with the correct arguments
+                mock_completions.assert_called_once()
+                self.assertEqual(mock_completions.call_args[0][0], document)
+                self.assertEqual(mock_completions.call_args[0][1], complete_event)
+                
+                # Verify that the completions were returned correctly
+                self.assertEqual(len(completions), 1)
+                self.assertEqual(completions[0].text, "test_plan.md")
+                self.assertEqual(completions[0].start_position, -4)
+                self.assertEqual(completions[0].display, "test_plan.md")
+            
+            # Test with different document text
+            document2 = Document("/code-from-plan ", cursor_position=15)
+            
+            with mock.patch.object(commands, "completions_raw_read_only") as mock_completions:
+                # Set up the mock to return some completions
+                mock_completions.return_value = [
+                    Completion(text="test_plan.md", start_position=0, display="test_plan.md")
+                ]
+                
+                # Call the method
+                completions = list(commands.completions_raw_code_from_plan(document2, complete_event))
+                
+                # Verify that completions_raw_read_only was called with the correct arguments
+                mock_completions.assert_called_once()
+                self.assertEqual(mock_completions.call_args[0][0], document2)
+                self.assertEqual(mock_completions.call_args[0][1], complete_event)
+                
+                # Verify that the completions were returned correctly
+                self.assertEqual(len(completions), 1)
+                self.assertEqual(completions[0].text, "test_plan.md")
+                self.assertEqual(completions[0].start_position, 0)
+                self.assertEqual(completions[0].display, "test_plan.md")
 
     def test_cmd_reasoning_effort(self):
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
