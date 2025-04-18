@@ -1575,13 +1575,35 @@ class Commands:
         # First add the plan file to context using the existing add command
         self.cmd_add(plan_path)
         
-        # Ask the model to analyze the plan first
-        self.cmd_ask(f"Please analyze the plan in {plan_path} and tell me how many steps it contains.")
-            
         # Create a PlanExecutor and run it
         from aider.plan_executor import PlanExecutor
         executor = PlanExecutor(self.coder, self.io)
-        executor.execute_plan(plan_path)
+        
+        # Get the number of steps in the plan
+        step_count = executor.get_step_count(plan_path)
+        
+        if step_count <= 0:
+            self.io.tool_error("Could not determine the number of steps in the plan.")
+            return
+            
+        self.io.tool_output(f"Found {step_count} steps in the plan.")
+        
+        # Execute each step one by one
+        for i in range(1, step_count + 1):
+            self.io.tool_output(f"\n[{i}/{step_count}] Executing step {i}")
+            
+            # Confirm before executing each step
+            if i > 1 and not self.io.confirm_ask(f"Continue with step {i}?"):
+                self.io.tool_output("Plan execution paused. Use /code-from-plan to resume.")
+                return
+                
+            # Execute the step by sending it to the LLM
+            prompt = f"I'm implementing a plan step by step. Please help me with step {i} from the plan. Implement just this step now."
+            
+            # Use the coder's run method to process this step
+            self.coder.run(prompt)
+            
+        self.io.tool_output("\n✅ Plan execution completed!")
 
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
