@@ -1567,7 +1567,7 @@ class Commands:
             self.io.tool_error("Please provide a path to a Markdown plan file")
             return
 
-        plan_path = Path(args.strip())
+        plan_path = args.strip()
         if not os.path.exists(plan_path):
             self.io.tool_error(f"Plan file not found: {plan_path}")
             return
@@ -1603,14 +1603,15 @@ class Commands:
             self.io.tool_output(f"Found {step_count} steps in the plan.")
             for i in range(1, step_count + 1):
                 prompt = (
-                    f"Implement setp {i} of the plan in in the .md file called: {plan_path.name}"
+                    f"Implement setp {i} of the plan in in the .md file called:"
+                    f" {Path(plan_path).name}"
                 )
                 self.cmd_code(prompt)
         except Exception:
             self.io.tool_output(
                 "Unable to determine number of steps. Will try to solve them all at once."
             )
-            prompt = f"Please, implement the plan in the {plan_path.name} file step by step."
+            prompt = f"Please, implement the plan in the {Path(plan_path).name} file step by step."
             self.cmd_code(prompt)
 
         self.io.tool_output("\nPlan execution completed!")
