@@ -2035,13 +2035,18 @@ class TestCommands(TestCase):
             invalid_plan_file.write_text("This is not a valid plan file.")
             
             with mock.patch.object(io, "tool_error") as mock_tool_error:
-                # Execute the command with an invalid plan file and expect ValueError
-                with self.assertRaises(ValueError):
-                    commands.cmd_code_from_plan(str(invalid_plan_file))
+                # Mock the coder.run method to raise ValueError
+                mock_run_instance = mock.MagicMock()
+                mock_run_instance.run.side_effect = ValueError("Could not determine the number of steps")
                 
-                # Verify that tool_error was called with the expected message
-                mock_tool_error.assert_called_once()
-                self.assertIn("Could not determine the number of steps", mock_tool_error.call_args[0][0])
+                with mock.patch("aider.coders.base_coder.Coder.create", return_value=mock_run_instance):
+                    # Execute the command with an invalid plan file and expect ValueError
+                    with self.assertRaises(ValueError):
+                        commands.cmd_code_from_plan(str(invalid_plan_file))
+                    
+                    # Verify that tool_error was called with the expected message
+                    mock_tool_error.assert_called_once()
+                    self.assertIn("Could not determine the number of steps", mock_tool_error.call_args[0][0])
             
             # Test case 3: User declines to proceed
             valid_plan_file = Path(repo_dir) / "valid_plan.md"
