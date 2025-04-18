@@ -1599,7 +1599,7 @@ class Commands:
 
         # Log that we're changing the confirm_ask method
         self.io.tool_output("Changing confirm_ask method to automatically approve edits from plan")
-        
+
         original_confirm_ask = self.io.confirm_ask
 
         self.io.confirm_ask = self.io.auto_confirm_ask
@@ -1622,9 +1622,13 @@ class Commands:
                 )
                 step_coder.run(prompt)
                 self.coder = step_coder
-                added_files = self.coder.get_inchat_relative_files()
-                self.io.tool_output(f"Dropping files in chat: {added_files}")
-                self.cmd_drop()
+                files2drop = [
+                    added_file
+                    for added_file in self.coder.get_inchat_relative_files()
+                    if added_file != Path(plan_path).name
+                ]
+                self.io.tool_output(f"Dropping files in chat: {files2drop}")
+                self.cmd_drop(" ".join(files2drop))
 
         except Exception:
             self.io.tool_output(
