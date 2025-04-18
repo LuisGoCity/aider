@@ -10,6 +10,8 @@ from unittest import TestCase, mock
 
 import git
 import pyperclip
+from prompt_toolkit.completion import Completion
+from prompt_toolkit.document import Document
 
 from aider.coders import Coder
 from aider.commands import Commands, SwitchCoder
