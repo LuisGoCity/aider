@@ -816,14 +816,116 @@ class InputOutput:
             return False
 
         # For everything else, use the original confirm_ask method
-        return self.confirm_ask(
-            question,
-            default=default,
-            subject=subject,
-            explicit_yes_required=explicit_yes_required,
-            group=group,
-            allow_never=allow_never,
-        )
+        self.num_user_asks += 1
+
+        # Ring the bell if needed
+        self.ring_bell()
+
+        question_id = (question, subject)
+
+        if question_id in self.never_prompts:
+            return False
+
+        if group and not group.show_group:
+            group = None
+        if group:
+            allow_never = True
+
+        valid_responses = ["yes", "no", "skip", "all"]
+        options = " (Y)es/(N)o"
+        if group:
+            if not explicit_yes_required:
+                options += "/(A)ll"
+            options += "/(S)kip all"
+        if allow_never:
+            options += "/(D)on't ask again"
+            valid_responses.append("don't")
+
+        if default.lower().startswith("y"):
+            question += options + " [Yes]: "
+        elif default.lower().startswith("n"):
+            question += options + " [No]: "
+        else:
+            question += options + f" [{default}]: "
+
+        if subject:
+            self.tool_output()
+            if "\n" in subject:
+                lines = subject.splitlines()
+                max_length = max(len(line) for line in lines)
+                padded_lines = [line.ljust(max_length) for line in lines]
+                padded_subject = "\n".join(padded_lines)
+                self.tool_output(padded_subject, bold=True)
+            else:
+                self.tool_output(subject, bold=True)
+
+        style = self._get_style()
+
+        def is_valid_response(text):
+            if not text:
+                return True
+            return text.lower() in valid_responses
+
+        if self.yes is True:
+            res = "n" if explicit_yes_required else "y"
+        elif self.yes is False:
+            res = "n"
+        elif group and group.preference:
+            res = group.preference
+            self.user_input(f"{question}{res}", log_only=False)
+        else:
+            while True:
+                try:
+                    if self.prompt_session:
+                        res = self.prompt_session.prompt(
+                            question,
+                            style=style,
+                            complete_while_typing=False,
+                        )
+                    else:
+                        res = input(question)
+                except EOFError:
+                    # Treat EOF (Ctrl+D) as if the user pressed Enter
+                    res = default
+                    break
+
+                if not res:
+                    res = default
+                    break
+                res = res.lower()
+                good = any(valid_response.startswith(res) for valid_response in valid_responses)
+                if good:
+                    break
+
+                error_message = f"Please answer with one of: {', '.join(valid_responses)}"
+                self.tool_error(error_message)
+
+        res = res.lower()[0]
+
+        if res == "d" and allow_never:
+            self.never_prompts.add(question_id)
+            hist = f"{question.strip()} {res}"
+            self.append_chat_history(hist, linebreak=True, blockquote=True)
+            return False
+
+        if explicit_yes_required:
+            is_yes = res == "y"
+        else:
+            is_yes = res in ("y", "a")
+
+        is_all = res == "a" and group is not None and not explicit_yes_required
+        is_skip = res == "s" and group is not None
+
+        if group:
+            if is_all and not explicit_yes_required:
+                group.preference = "all"
+            elif is_skip:
+                group.preference = "skip"
+
+        hist = f"{question.strip()} {res}"
+        self.append_chat_history(hist, linebreak=True, blockquote=True)
+
+        return is_yes
 
     @restore_multiline
     def confirm_ask(
