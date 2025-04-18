@@ -2141,6 +2141,51 @@ class TestCommands(TestCase):
                 self.assertEqual(completions[0].text, "test_plan.md")
                 self.assertEqual(completions[0].start_position, 0)
                 self.assertEqual(completions[0].display, "test_plan.md")
+    
+    def test_completions_raw_code_from_plan_error_handling(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Test case 1: Invalid command format (no space after command)
+            document1 = Document("/code-from-plan", cursor_position=15)
+            complete_event = mock.MagicMock()
+            
+            # The function should return an empty list when the command format is invalid
+            completions = list(commands.completions_raw_code_from_plan(document1, complete_event))
+            self.assertEqual(len(completions), 0)
+            
+            # Test case 2: completions_raw_read_only returns empty list
+            document2 = Document("/code-from-plan ", cursor_position=16)
+            
+            with mock.patch.object(commands, "completions_raw_read_only", return_value=[]) as mock_completions:
+                completions = list(commands.completions_raw_code_from_plan(document2, complete_event))
+                
+                # Verify that completions_raw_read_only was called
+                mock_completions.assert_called_once()
+                
+                # Verify that an empty list is returned
+                self.assertEqual(len(completions), 0)
+            
+            # Test case 3: completions_raw_read_only raises an exception
+            document3 = Document("/code-from-plan test", cursor_position=20)
+            
+            with mock.patch.object(commands, "completions_raw_read_only", side_effect=Exception("Test exception")) as mock_completions:
+                # The function should handle the exception and return an empty list
+                completions = list(commands.completions_raw_code_from_plan(document3, complete_event))
+                
+                # Verify that completions_raw_read_only was called
+                mock_completions.assert_called_once()
+                
+                # Verify that an empty list is returned
+                self.assertEqual(len(completions), 0)
+            
+            # Test case 4: Command text doesn't match expected pattern
+            document4 = Document("/some-other-command ", cursor_position=18)
+            
+            completions = list(commands.completions_raw_code_from_plan(document4, complete_event))
+            self.assertEqual(len(completions), 0)
 
     def test_cmd_reasoning_effort(self):
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
