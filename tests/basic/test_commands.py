@@ -2012,6 +2012,73 @@ class TestCommands(TestCase):
                     mock_tool_output.assert_any_call("Found 2 steps in the plan.")
                     mock_tool_output.assert_any_call("Implementing step 1")
                     mock_tool_output.assert_any_call("Implementing step 2")
+    
+    def test_cmd_code_from_plan_error_handling(self):
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Test case 1: File not found
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Execute the command with a non-existent file
+                commands.cmd_code_from_plan("non_existent_file.md")
+                
+                # Verify that tool_error was called with the expected message
+                mock_tool_error.assert_called_once_with("File not found: non_existent_file.md")
+            
+            # Test case 2: File exists but is not a valid plan
+            invalid_plan_file = Path(repo_dir) / "invalid_plan.md"
+            invalid_plan_file.write_text("This is not a valid plan file.")
+            
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Execute the command with an invalid plan file
+                commands.cmd_code_from_plan(str(invalid_plan_file))
+                
+                # Verify that tool_error was called with the expected message
+                mock_tool_error.assert_called_once()
+                self.assertIn("Could not determine the number of steps", mock_tool_error.call_args[0][0])
+            
+            # Test case 3: User declines to proceed
+            valid_plan_file = Path(repo_dir) / "valid_plan.md"
+            valid_plan_file.write_text("# Test Plan\n\n## Step 1\n- Do something\n")
+            
+            with (
+                mock.patch.object(io, "auto_confirm_ask", return_value=False) as mock_auto_confirm,
+                mock.patch.object(io, "tool_error") as mock_tool_error,
+            ):
+                # Mock the coder.run method to return a step count
+                mock_run_instance = mock.MagicMock()
+                mock_run_instance.run.return_value = "1"
+                
+                with mock.patch("aider.coders.base_coder.Coder.create", return_value=mock_run_instance):
+                    # Execute the command
+                    commands.cmd_code_from_plan(str(valid_plan_file))
+                    
+                    # Verify that auto_confirm_ask was called
+                    mock_auto_confirm.assert_called_once()
+                    
+                    # Verify that no further processing occurred
+                    self.assertEqual(mock_run_instance.run.call_count, 1)
+            
+            # Test case 4: Exception during execution
+            with (
+                mock.patch.object(io, "auto_confirm_ask", return_value=True) as mock_auto_confirm,
+                mock.patch.object(commands, "_run_new_coder", side_effect=Exception("Test exception")) as mock_run_new_coder,
+                mock.patch.object(io, "tool_error") as mock_tool_error,
+            ):
+                # Mock the coder.run method to return a step count
+                mock_run_instance = mock.MagicMock()
+                mock_run_instance.run.return_value = "1"
+                
+                with mock.patch("aider.coders.base_coder.Coder.create", return_value=mock_run_instance):
+                    # Execute the command
+                    commands.cmd_code_from_plan(str(valid_plan_file))
+                    
+                    # Verify that tool_error was called with the expected message
+                    mock_tool_error.assert_called_once()
+                    self.assertIn("Error implementing step", mock_tool_error.call_args[0][0])
+                    self.assertIn("Test exception", mock_tool_error.call_args[0][0])
 
     def test_cmd_reasoning_effort(self):
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
