@@ -1625,6 +1625,13 @@ class Commands:
             self.io.confirm_ask = original_confirm_ask
 
         self.io.tool_output("\nPlan execution completed!")
+        raise SwitchCoder(
+            edit_format=self.coder.edit_format,
+            summarize_from_coder=False,
+            from_coder=self.coder,
+            show_announcements=False,
+            placeholder=None,
+        )
 
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
