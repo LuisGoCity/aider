@@ -1590,11 +1590,8 @@ class Commands:
 
         # Use the ask command to get the step count
         response = temp_coder.run(
-            (
-                "How many steps are in the plan? Please return only an integer corresponding to"
-                " the number of steps."
-            ),
-            with_message=True,
+            "How many steps are in the plan? Please return only an integer corresponding to"
+            " the number of steps."
         )
 
         # Extract the number from the response
