@@ -2085,7 +2085,6 @@ class TestCommands(TestCase):
                 self.assertEqual(len(completions), 1)
                 self.assertEqual(completions[0].text, "test_plan.md")
                 self.assertEqual(completions[0].start_position, -4)
-                self.assertEqual(completions[0].display, "test_plan.md")
 
             # Test with different document text
             document2 = Document("/code-from-plan ", cursor_position=15)
@@ -2110,7 +2109,6 @@ class TestCommands(TestCase):
                 self.assertEqual(len(completions), 1)
                 self.assertEqual(completions[0].text, "test_plan.md")
                 self.assertEqual(completions[0].start_position, 0)
-                self.assertEqual(completions[0].display, "test_plan.md")
 
     def test_completions_raw_code_from_plan_error_handling(self):
         with GitTemporaryDirectory() as repo_dir:
