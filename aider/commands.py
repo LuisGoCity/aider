@@ -1574,6 +1574,9 @@ class Commands:
         
         # First add the plan file to context using the existing add command
         self.cmd_add(plan_path)
+        
+        # Ask the model to analyze the plan first
+        self.cmd_ask(f"Please analyze the plan in {plan_path} and tell me how many steps it contains.")
             
         # Create a PlanExecutor and run it
         from aider.plan_executor import PlanExecutor
