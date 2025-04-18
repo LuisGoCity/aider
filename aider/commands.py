@@ -1581,7 +1581,7 @@ class Commands:
         # Create a temporary coder to handle this question
         from aider.coders.base_coder import Coder
 
-        temp_coder = Coder.create(
+        number_of_steps_worker = Coder.create(
             io=self.io,
             from_coder=self.coder,
             edit_format="ask",
@@ -1589,7 +1589,7 @@ class Commands:
         )
 
         # Use the ask command to get the step count
-        response = temp_coder.run(
+        response = number_of_steps_worker.run(
             "How many steps are in the plan? Please return only an integer corresponding to"
             " the number of steps."
         )
@@ -1603,7 +1603,15 @@ class Commands:
                     f"Implement setp {i} of the plan in in the .md file called:"
                     f" {Path(plan_path).name}"
                 )
-                self.cmd_code(prompt)
+                step_coder = Coder.create(
+                    io=self.io,
+                    from_coder=self.coder,
+                    edit_format=self.coder.main_model.edit_format,
+                    summarize_from_coder=True,
+                )
+                step_coder.run(prompt)
+                self.coder = step_coder
+
         except Exception:
             self.io.tool_output(
                 "Unable to determine number of steps. Will try to solve them all at once."
