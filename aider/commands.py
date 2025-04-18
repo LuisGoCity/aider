@@ -1615,6 +1615,7 @@ class Commands:
                 )
                 step_coder.run(prompt)
                 self.coder = step_coder
+                self.cmd_drop()
 
         except Exception:
             self.io.tool_output(
