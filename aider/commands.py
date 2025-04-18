@@ -1646,6 +1646,7 @@ class Commands:
         )
 
         # change confirm_ask function to automatically say yes/no to specific commands.
+        self.io.tool_output("Changing confirm_ask method to automatically approve edits from plan")
         original_confirm_ask = self.io.confirm_ask
         self.io.confirm_ask = self.io.auto_confirm_ask
 
