@@ -1601,6 +1601,7 @@ class Commands:
             step_count = int(response)
             self.io.tool_output(f"Found {step_count} steps in the plan.")
             for i in range(1, step_count + 1):
+                self.io.tool_output(f"Implementing step {i}")
                 prompt = (
                     f"Implement setp {i} of the plan in in the .md file called:"
                     f" {Path(plan_path).name}"
