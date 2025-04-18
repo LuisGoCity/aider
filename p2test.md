@@ -1,3 +1,0 @@
-## Steps
-1. Add a logging message to the `cmd_code_from_plan` method in `aider/commands.py` before the `self.cmd_add(plan_path)` line statement indicating the path the file will be loaded from.
-2. Add a logging message to the `cmd_code_from_plan` method in `aider/commands.py` before the `original_confirm_ask = self.io.confirm_ask` line statement indicating that we're changing the confirm_task method
