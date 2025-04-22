@@ -359,8 +359,12 @@ class Commands:
         changed_files = self.coder.repo.get_changed_files(default_branch, current_branch)
         self.io.tool_output("Generating PR description based on changes...")
 
-        self.cmd_add(changed_files)
-
+        self.cmd_add(" ".join(changed_files))
+        # instantiate context coder
+        # add prompt for descrpition
+        # run descrpition and store output in variable
+        # run another context instance to generate pr title based on description
+        # raise pr
         return commit_history
 
     def cmd_lint(self, args="", fnames=None):
