@@ -490,3 +490,31 @@ class TestRepo(unittest.TestCase):
             # Test default branch detection - should still be "main"
             default_branch = git_repo.get_default_branch()
             self.assertEqual(default_branch, "main")
+            
+    def test_get_default_branch_error_handling(self):
+        """Test that get_default_branch handles errors gracefully"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            
+            # Create a file to commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+            
+            # Test normal behavior first
+            default_branch = git_repo.get_default_branch()
+            self.assertIsNotNone(default_branch)
+            
+            # Mock git.rev_parse to simulate git errors
+            with patch.object(raw_repo.git, 'rev_parse', side_effect=git.exc.GitCommandError('rev-parse', 128)):
+                # Replace the repo in git_repo with our mocked repo
+                git_repo.repo = raw_repo
+                
+                # Method should return None when both branch checks fail
+                default_branch = git_repo.get_default_branch()
+                self.assertIsNone(default_branch)
