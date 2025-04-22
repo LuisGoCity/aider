@@ -60,20 +60,33 @@ class PlanCoder(Coder):
         try:
             num_steps = int(self.partial_response_content)
             if num_steps <= 0:
-                raise ValueError("No steps detected")  # Fallback to at least one step
+                raise ValueError("No steps detected")  # If no steps detected, raise ValueError
+
+            self.io.tool_output(f"Identified {num_steps} implementation steps")
+
+            all_identified_files = {}
+
+            # Make one call per step
+            for step_num in range(1, num_steps + 1):
+                self.io.tool_output(f"Identifying files for step {step_num} of {num_steps}...")
+
+                all_identified_files[f"Step {step_num}"] = self.files_in_step(
+                    initial_plan, step_num
+                )
+
+            return all_identified_files
         except (ValueError, TypeError):
-            self.io.tool_warning("Could not determine number of steps, defaulting to 1")
-            num_steps = 1
+            self.io.tool_warning(
+                "Could not determine number of steps, returning all files at once."
+            )
+            message = (
+                "Please, detetermine the specific files thhat wuld need editing to implement the"
+                " plan below:\n\n"
+                + initial_plan
+            )
 
-        self.io.tool_output(f"Identified {num_steps} implementation steps")
-
-        all_identified_files = set()
-
-        # Make one call per step
-        for step_num in range(1, num_steps + 1):
-            self.io.tool_output(f"Identifying files for step {step_num} of {num_steps}...")
-
-            all_identified_files.update(self.files_in_step(initial_plan, step_num))
+            context_coder = self.ask_context_coder(message)
+            return {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
 
         return sorted(list(all_identified_files))
 
