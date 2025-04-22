@@ -43,8 +43,7 @@ class PlanCoder(Coder):
             " implementation plan with specific changes needed for each file."
         )
 
-        self.init_before_message()
-        list(self.send_message(message))  # Consume the generator
+        self.run_one(message, preproc=False)
         return self.partial_response_content
 
     def identify_affected_files(self, initial_plan):
