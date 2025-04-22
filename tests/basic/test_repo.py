@@ -621,3 +621,44 @@ class TestRepo(unittest.TestCase):
                 # Method should raise the GitCommandError
                 with self.assertRaises(git.exc.GitCommandError):
                     git_repo.get_changed_files("master", "feature")
+                    
+    def test_get_changed_files(self):
+        """Test that get_changed_files correctly returns files changed between branches"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+            
+            # Create a file and make initial commit on master branch
+            fname1 = Path("test_file1.txt")
+            fname1.write_text("initial content")
+            raw_repo.git.add(str(fname1))
+            raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+            
+            # Modify existing file
+            fname1.write_text("modified content")
+            raw_repo.git.add(str(fname1))
+            
+            # Add new file
+            fname2 = Path("test_file2.txt")
+            fname2.write_text("new file content")
+            raw_repo.git.add(str(fname2))
+            
+            # Commit changes on feature branch
+            raw_repo.git.commit("-m", "Feature changes")
+            
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+            
+            # Get changed files between master and feature
+            changed_files = git_repo.get_changed_files("master", "feature")
+            
+            # Verify both files are in the changed files list
+            self.assertIn("test_file1.txt", changed_files)
+            self.assertIn("test_file2.txt", changed_files)
+            self.assertEqual(len(changed_files), 2)
