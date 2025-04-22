@@ -465,7 +465,7 @@ class TestRepo(unittest.TestCase):
             fname.write_text("initial content")
             raw_repo.git.add(str(fname))
             
-            # Do the initial commit on main branch (default for git init)
+            # Do the initial commit on master branch (default for git init)
             raw_repo.git.commit("-m", "Initial commit")
             
             # Create GitRepo instance
@@ -473,27 +473,27 @@ class TestRepo(unittest.TestCase):
             
             # Test default branch detection - should be "master" initially
             default_branch = git_repo.get_default_branch()
-            self.assertEqual(default_branch, "main")
+            self.assertEqual(default_branch, "master")
             
             # Create and switch to "main" branch
-            raw_repo.git.branch("master")
-            raw_repo.git.checkout("master")
+            raw_repo.git.branch("main")
+            raw_repo.git.checkout("main")
             
-            # Test default branch detection again - should still find "master" first
-            # since both branches exist and "main" is checked alphabetically first
+            # Test default branch detection again - should find "main" first
+            # since the implementation checks for "main" before "master"
             default_branch = git_repo.get_default_branch()
-            self.assertEqual(default_branch, "master")
+            self.assertEqual(default_branch, "main")
             
-            # Delete main branch to test only master exists
-            raw_repo.git.branch("-D", "main")
+            # Delete master branch to test only main exists
+            raw_repo.git.branch("-D", "master")
             
-            # Test default branch detection - should be "main" now
+            # Test default branch detection - should still be "main"
             default_branch = git_repo.get_default_branch()
-            self.assertEqual(default_branch, "master")
+            self.assertEqual(default_branch, "main")
             
             # Test with neither main nor master (create a different branch)
             raw_repo.git.checkout("-b", "development")
-            raw_repo.git.branch("-D", "master")
+            raw_repo.git.branch("-D", "main")
             
             # Test default branch detection - should return None
             default_branch = git_repo.get_default_branch()
