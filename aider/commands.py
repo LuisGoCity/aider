@@ -1629,7 +1629,7 @@ class Commands:
         impementation_plan = plan_coder.run(ticket_content)
 
         # Save the plan to a markdown file
-        output_path = os.path.splitext(ticket_path)[0] + "_plan.md"
+        output_path = os.path.splitext(ticket_path)[0] + "implementation_plan.md"
         try:
             with open(output_path, "w", encoding=self.io.encoding) as f:
                 f.write(impementation_plan)
