@@ -47,6 +47,37 @@ class PlanCoder(Coder):
         return self.partial_response_content
 
     def identify_affected_files(self, initial_plan):
+        # First, ask the LLM to identify how many steps are in the plan
+        message = (
+            "How many distinct implementation steps are in this plan? Please respond with just an"
+            " integer corresponingto the number of steps:\n\n"
+            + initial_plan
+        )
+
+        self.run_one(message, preproc=False)
+        self.remove_reasoning_content()
+        # Extract the number from the response
+        try:
+            num_steps = int(self.partial_response_content)
+            if num_steps <= 0:
+                raise ValueError("No steps detected")  # Fallback to at least one step
+        except (ValueError, TypeError):
+            self.io.tool_warning("Could not determine number of steps, defaulting to 1")
+            num_steps = 1
+
+        self.io.tool_output(f"Identified {num_steps} implementation steps")
+
+        all_identified_files = set()
+
+        # Make one call per step
+        for step_num in range(1, num_steps + 1):
+            self.io.tool_output(f"Identifying files for step {step_num} of {num_steps}...")
+
+            all_identified_files.update(self.files_in_step(initial_plan, step_num))
+
+        return sorted(list(all_identified_files))
+
+    def files_in_step(self, initial_plan, step_num):
         # Create a temporary instance of ContextCoder
         context_coder = ContextCoder(
             self.main_model,
@@ -55,46 +86,18 @@ class PlanCoder(Coder):
             map_tokens=self.repo_map.max_map_tokens if self.repo_map else 1024,
             verbose=self.verbose,
         )
-        
-        # First, ask the LLM to identify how many steps are in the plan
+        # Use the context_coder to identify relevant files for this step
         message = (
-            "How many distinct implementation steps are in this plan? Please respond with just a number:\n\n"
-            + initial_plan
+            f"For step {step_num} of the implementation plan below, identify all files that will"
+            " need to be modified or created. List only the file paths, one per"
+            f" line:\n\n{initial_plan}"
         )
-        
-        self.run_one(message, preproc=False)
-        
-        # Extract the number from the response
-        try:
-            num_steps = int(''.join(filter(str.isdigit, self.partial_response_content.strip())))
-            if num_steps <= 0:
-                num_steps = 1  # Fallback to at least one step
-        except (ValueError, TypeError):
-            self.io.tool_warning("Could not determine number of steps, defaulting to 1")
-            num_steps = 1
-        
-        self.io.tool_output(f"Identified {num_steps} implementation steps")
-        
-        all_identified_files = set()
-        
-        # Make one call per step
-        for step_num in range(1, num_steps + 1):
-            self.io.tool_output(f"Identifying files for step {step_num} of {num_steps}...")
-            
-            # Use the context_coder to identify relevant files for this step
-            message = (
-                f"For step {step_num} of the implementation plan below, identify all files that will need to be "
-                f"modified or created. List only the file paths, one per line:\n\n{initial_plan}"
-            )
-            
-            # Run the context_coder with our message
-            context_coder.run_one(message, preproc=False)
-            
-            # Add the identified files to our set
-            step_files = {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
-            all_identified_files.update(step_files)
-            
-            # Clear the context_coder's files for the next step
-            context_coder.abs_fnames.clear()
-        
-        return sorted(list(all_identified_files))
+
+        # Run the context_coder with our message
+        context_coder.run_one(message, preproc=False)
+
+        # Add the identified files to our set
+        step_files = {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
+        # Clear the context_coder's files for the next step
+        context_coder.abs_fnames.clear()
+        return step_files
