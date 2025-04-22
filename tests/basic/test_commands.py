@@ -2767,3 +2767,74 @@ class TestCommands(TestCase):
 
                 # Verify PR creation
                 mock_raise_pr.assert_called()
+                
+    def test_cmd_raise_pr_error_handling(self):
+        """Test that cmd_raise_pr handles errors gracefully"""
+        # Test case 1: No git repository
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        coder.repo = None  # Explicitly set repo to None
+        commands = Commands(io, coder)
+        
+        with mock.patch.object(io, "tool_error") as mock_tool_error:
+            commands.cmd_raise_pr()
+            mock_tool_error.assert_called_once_with("No git repository found.")
+        
+        # Test case 2: Cannot determine default branch
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+        
+        with (
+            mock.patch.object(commands, "_clear_chat_history"),
+            mock.patch.object(commands, "_drop_all_files"),
+            mock.patch.object(coder.repo, "get_default_branch", return_value=None),
+            mock.patch.object(io, "tool_error") as mock_tool_error,
+        ):
+            commands.cmd_raise_pr()
+            mock_tool_error.assert_called_once_with(
+                "Could not determine default branch (main or master)."
+            )
+        
+        # Test case 3: Error getting commit history
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+        
+        with (
+            mock.patch.object(commands, "_clear_chat_history"),
+            mock.patch.object(commands, "_drop_all_files"),
+            mock.patch.object(coder.repo, "get_default_branch", return_value="main"),
+            mock.patch.object(
+                coder.repo, 
+                "get_commit_history", 
+                side_effect=git.exc.GitCommandError("git log", 128)
+            ),
+            mock.patch.object(io, "tool_error") as mock_tool_error,
+        ):
+            commands.cmd_raise_pr()
+            mock_tool_error.assert_called_once_with(
+                "Unable to complete raise_pr: GitCommandError(\"git log\", 128)"
+            )
+        
+        # Test case 4: Error getting changed files
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+        
+        with (
+            mock.patch.object(commands, "_clear_chat_history"),
+            mock.patch.object(commands, "_drop_all_files"),
+            mock.patch.object(coder.repo, "get_default_branch", return_value="main"),
+            mock.patch.object(coder.repo, "get_commit_history", return_value="commit1\ncommit2"),
+            mock.patch.object(
+                coder.repo, 
+                "get_changed_files", 
+                side_effect=git.exc.GitCommandError("git diff", 128)
+            ),
+            mock.patch.object(io, "tool_error") as mock_tool_error,
+        ):
+            commands.cmd_raise_pr()
+            mock_tool_error.assert_called_once_with(
+                "Unable to complete raise_pr: GitCommandError(\"git diff\", 128)"
+            )
