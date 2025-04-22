@@ -662,3 +662,73 @@ class TestRepo(unittest.TestCase):
             self.assertIn("test_file1.txt", changed_files)
             self.assertIn("test_file2.txt", changed_files)
             self.assertEqual(len(changed_files), 2)
+            
+    def test_raise_pr(self):
+        """Test that raise_pr correctly calls GitHub CLI to create a PR"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+            
+            # Create a file and make initial commit on master branch
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+            
+            # Make changes and commit on feature branch
+            fname.write_text("feature change")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature change")
+            
+            # Create GitRepo instance with mock IO
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+            
+            # Mock subprocess.run to simulate successful PR creation
+            pr_url = "https://github.com/user/repo/pull/123"
+            mock_result = unittest.mock.Mock()
+            mock_result.returncode = 0
+            mock_result.stdout = pr_url + "\n"
+            
+            with patch('subprocess.run', return_value=mock_result) as mock_run:
+                # Call raise_pr method
+                git_repo.raise_pr(
+                    "master", 
+                    "feature", 
+                    "Test PR Title", 
+                    "Test PR Description"
+                )
+                
+                # Verify subprocess.run was called with correct arguments
+                mock_run.assert_called_once()
+                args = mock_run.call_args[0][0]
+                self.assertEqual(args[0], "gh")
+                self.assertEqual(args[1], "pr")
+                self.assertEqual(args[2], "create")
+                self.assertEqual(args[4], "master")
+                self.assertEqual(args[6], "feature")
+                self.assertEqual(args[8], "Test PR Title")
+                self.assertEqual(args[10], "Test PR Description")
+                
+            # Test when GitHub CLI is not available
+            with patch('subprocess.run', side_effect=FileNotFoundError()) as mock_run:
+                # Reset IO to capture new messages
+                io = InputOutput()
+                git_repo = GitRepo(io, None, None)
+                
+                # Call raise_pr method
+                git_repo.raise_pr(
+                    "master", 
+                    "feature", 
+                    "Test PR Title", 
+                    "Test PR Description"
+                )
+                
+                # Verify error message was output
+                mock_run.assert_called_once()
