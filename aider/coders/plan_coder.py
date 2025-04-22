@@ -78,6 +78,22 @@ class PlanCoder(Coder):
         return sorted(list(all_identified_files))
 
     def files_in_step(self, initial_plan, step_num):
+        # Use the context_coder to identify relevant files for this step
+        message = (
+            f"For step {step_num} of the implementation plan below, identify all files that will"
+            " need to be modified or created. List only the file paths, one per"
+            f" line:\n\n{initial_plan}"
+        )
+
+        context_coder = self.ask_context_coder(message)
+
+        # Add the identified files to our set
+        step_files = {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
+        # Clear the context_coder's files for the next step
+        context_coder.abs_fnames.clear()
+        return step_files
+
+    def ask_context_coder(self, message):
         # Create a temporary instance of ContextCoder
         context_coder = ContextCoder(
             self.main_model,
@@ -86,18 +102,7 @@ class PlanCoder(Coder):
             map_tokens=self.repo_map.max_map_tokens if self.repo_map else 1024,
             verbose=self.verbose,
         )
-        # Use the context_coder to identify relevant files for this step
-        message = (
-            f"For step {step_num} of the implementation plan below, identify all files that will"
-            " need to be modified or created. List only the file paths, one per"
-            f" line:\n\n{initial_plan}"
-        )
-
         # Run the context_coder with our message
         context_coder.run_one(message, preproc=False)
 
-        # Add the identified files to our set
-        step_files = {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
-        # Clear the context_coder's files for the next step
-        context_coder.abs_fnames.clear()
-        return step_files
+        return context_coder
