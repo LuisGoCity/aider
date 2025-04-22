@@ -2687,3 +2687,77 @@ class TestCommands(TestCase):
                 self.assertEqual(len(completions), 2)
                 self.assertEqual(completions[0].text, "test.md")
                 self.assertEqual(completions[1].text, "test.txt")
+                
+    def test_cmd_raise_pr_positive_outcome(self):
+        """Test that cmd_raise_pr correctly creates a pull request"""
+        with GitTemporaryDirectory() as repo_dir:
+            # Create a git repository with a main branch and a feature branch
+            repo = git.Repo(repo_dir)
+            repo.config_writer().set_value("user", "name", "Test User").release()
+            repo.config_writer().set_value("user", "email", "test@example.com").release()
+            
+            # Create a file and make initial commit on main branch
+            main_file = Path(repo_dir) / "main_file.txt"
+            main_file.write_text("Initial content")
+            repo.git.add(str(main_file))
+            repo.git.commit("-m", "Initial commit on main")
+            
+            # Create and switch to feature branch
+            repo.git.branch("feature")
+            repo.git.checkout("feature")
+            
+            # Make changes on feature branch
+            feature_file = Path(repo_dir) / "feature_file.txt"
+            feature_file.write_text("Feature content")
+            repo.git.add(str(feature_file))
+            repo.git.commit("-m", "Add feature file")
+            
+            # Setup mocks and test objects
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock necessary methods and objects
+            with (
+                mock.patch.object(commands, "_clear_chat_history") as mock_clear_history,
+                mock.patch.object(commands, "_drop_all_files") as mock_drop_files,
+                mock.patch.object(commands, "cmd_add") as mock_cmd_add,
+                mock.patch("aider.coders.base_coder.Coder.create") as mock_create_coder,
+                mock.patch.object(coder.repo, "get_default_branch", return_value="main") as mock_get_default,
+                mock.patch.object(coder.repo, "get_commit_history", return_value="commit1\ncommit2") as mock_get_history,
+                mock.patch.object(coder.repo, "get_changed_files", return_value=["feature_file.txt"]) as mock_get_files,
+                mock.patch.object(coder.repo, "raise_pr") as mock_raise_pr,
+            ):
+                # Create mock context coder
+                mock_context_coder = mock.MagicMock()
+                mock_context_coder.run.side_effect = ["PR description", "PR title"]
+                mock_create_coder.return_value = mock_context_coder
+                
+                # Execute the command
+                commands.cmd_raise_pr()
+                
+                # Verify the command flow
+                mock_clear_history.assert_called_once()
+                mock_drop_files.assert_called_once()
+                mock_get_default.assert_called_once()
+                mock_get_history.assert_called_once_with("main", "feature")
+                mock_get_files.assert_called_once_with("main", "feature")
+                mock_cmd_add.assert_called_once_with("feature_file.txt")
+                
+                # Verify context coder creation and usage
+                mock_create_coder.assert_called_once()
+                self.assertEqual(mock_create_coder.call_args[1]["edit_format"], "ask")
+                self.assertEqual(mock_create_coder.call_args[1]["summarize_from_coder"], False)
+                
+                # Verify PR description and title generation
+                self.assertEqual(mock_context_coder.run.call_count, 2)
+                description_prompt = mock_context_coder.run.call_args_list[0][0][0]
+                self.assertIn("Based on the changes in this branch", description_prompt)
+                self.assertIn("commit1\ncommit2", description_prompt)
+                
+                title_prompt = mock_context_coder.run.call_args_list[1][0][0]
+                self.assertIn("Based on this PR description", title_prompt)
+                self.assertIn("PR description", title_prompt)
+                
+                # Verify PR creation
+                mock_raise_pr.assert_called_once_with("main", "feature", "PR title", "PR description")
