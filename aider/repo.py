@@ -462,3 +462,31 @@ class GitRepo:
         if not commit:
             return default
         return commit.message
+
+    def get_default_branch(self):
+        """Determine the default branch (main or master)"""
+        for branch_name in ["main", "master"]:
+            try:
+                self.repo.git.rev_parse(f"--verify {branch_name}")
+                return branch_name
+            except ANY_GIT_ERROR:
+                continue
+        return None
+
+    def get_commit_history(self, base_branch, compare_branch):
+        """Get commit history between two branches"""
+        try:
+            return self.repo.git.log(
+                f"{base_branch}..{compare_branch}", "--pretty=format:%h %s", "--no-merges"
+            )
+        except ANY_GIT_ERROR as e:
+            raise e
+
+    def get_changed_files(self, base_branch, compare_branch):
+        """Get list of files changed between two branches"""
+        try:
+            return self.repo.git.diff(
+                f"{base_branch}..{compare_branch}", "--name-only"
+            ).splitlines()
+        except ANY_GIT_ERROR as e:
+            raise e
