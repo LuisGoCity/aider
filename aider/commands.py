@@ -1592,6 +1592,8 @@ class Commands:
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
 
+    def cmd_plan_implementation(self, args):
+        pass
     def cmd_code_from_plan(self, args):
         "Execute a coding plan from a Markdown file step by step"
         if not args.strip():
