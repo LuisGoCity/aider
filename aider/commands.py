@@ -341,6 +341,28 @@ class Commands:
         commit_message = args.strip() if args else None
         self.coder.repo.commit(message=commit_message)
 
+    def cmd_raise_pr(self, args=None):
+        "Create a pull request for the current branch with an AI-generated description"
+
+        if not self.coder.repo:
+            self.io.tool_error("No git repository found.")
+            return
+
+        current_branch = self.coder.repo.repo.active_branch
+        default_branch = self.coder.repo.get_default_branch()
+        if not default_branch:
+            self.io.tool_error("Could not determine default branch (main or master).")
+            return
+
+        self.io.tool_output(f"Creating PR from branch '{current_branch}' to '{default_branch}'...")
+        commit_history = self.coder.repo.get_commit_history(default_branch, current_branch)
+        changed_files = self.coder.repo.get_changed_files(default_branch, current_branch)
+        self.io.tool_output("Generating PR description based on changes...")
+
+        self.cmd_add(changed_files)
+
+        return commit_history
+
     def cmd_lint(self, args="", fnames=None):
         "Lint and fix in-chat files or all dirty files if none in chat"
 
