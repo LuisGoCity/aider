@@ -31,6 +31,7 @@ class PlanCoder(Coder):
         self.io.tool_output(
             f"From the ticket provided, here is how I would implement this feature:\n{final_plan}"
         )
+        return final_plan
 
     def generate_initial_plan(self, ticket_content):
         message = f"Please create an implementation plan for this JIRA ticket:\n\n{ticket_content}"

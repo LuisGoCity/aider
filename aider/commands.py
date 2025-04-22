@@ -1595,7 +1595,9 @@ class Commands:
     def cmd_plan_implementation(self, args):
         "Generate an implementation plan from a JIRA ticket or feature specification file"
         if not args.strip():
-            self.io.tool_error("Please provide a path to a JIRA ticket or feature specification file")
+            self.io.tool_error(
+                "Please provide a path to a JIRA ticket or feature specification file"
+            )
             return
 
         ticket_path = args.strip()
@@ -1614,7 +1616,7 @@ class Commands:
 
         # Create a PlanCoder instance
         from aider.coders.plan_coder import PlanCoder
-        
+
         plan_coder = PlanCoder(
             self.coder.main_model,
             self.io,
@@ -1622,37 +1624,20 @@ class Commands:
             map_tokens=self.coder.repo_map.max_map_tokens if self.coder.repo_map else 1024,
             verbose=self.verbose,
         )
-        
+
         # Generate the plan
-        initial_plan = plan_coder.generate_initial_plan(ticket_content)
-        files_to_edit = plan_coder.identify_affected_files(initial_plan)
-        final_plan = plan_coder.generate_final_plan(ticket_content, initial_plan, files_to_edit)
-        
+        impementation_plan = plan_coder.run(ticket_content)
+
         # Save the plan to a markdown file
         output_path = os.path.splitext(ticket_path)[0] + "_plan.md"
         try:
             with open(output_path, "w", encoding=self.io.encoding) as f:
-                f.write("# Implementation Plan\n\n")
-                f.write(f"Generated from: {os.path.basename(ticket_path)}\n\n")
-                f.write("## Initial Plan\n\n")
-                f.write(initial_plan)
-                f.write("\n\n## Files to Modify\n\n")
-                
-                if isinstance(files_to_edit, dict):
-                    for step, files in files_to_edit.items():
-                        f.write(f"### {step}\n")
-                        for file in sorted(files):
-                            f.write(f"- {file}\n")
-                else:
-                    for file in sorted(files_to_edit):
-                        f.write(f"- {file}\n")
-                
-                f.write("\n\n## Detailed Implementation Plan\n\n")
-                f.write(final_plan)
-            
+                f.write(impementation_plan)
+
             self.io.tool_output(f"Implementation plan saved to {output_path}")
         except Exception as e:
             self.io.tool_error(f"Error saving implementation plan: {e}")
+
     def cmd_code_from_plan(self, args):
         "Execute a coding plan from a Markdown file step by step"
         if not args.strip():
