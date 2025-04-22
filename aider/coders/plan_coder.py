@@ -20,6 +20,7 @@ class PlanCoder(Coder):
         self.repo_map.refresh = "always"
         self.repo_map.max_map_tokens *= self.repo_map.map_mul_no_files
         self.repo_map.map_mul_no_files = 1.0
+        self.io.confirm_ask = self.io.auto_confirm_ask
 
     def run(self, ticket_content):
         initial_plan = self.generate_initial_plan(ticket_content)
