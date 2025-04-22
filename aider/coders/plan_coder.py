@@ -24,8 +24,7 @@ class PlanCoder(Coder):
             "Please create an initial implementation plan for this JIRA"
             f" ticket:\n\n{ticket_content}"
         )
-        self.init_before_message()
-        list(self.send_message(message))  # Consume the generator
+        self.run_one(message, preproc=False)
         return self.partial_response_content
 
     def generate_final_plan(self, ticket_content, initial_plan, affected_files):
