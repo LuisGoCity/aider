@@ -88,8 +88,6 @@ class PlanCoder(Coder):
             context_coder = self.ask_context_coder(message)
             return {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
 
-        return sorted(list(all_identified_files))
-
     def files_in_step(self, initial_plan, step_num):
         # Use the context_coder to identify relevant files for this step
         message = (
