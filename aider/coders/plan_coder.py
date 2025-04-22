@@ -19,6 +19,17 @@ class PlanCoder(Coder):
         self.repo_map.max_map_tokens *= self.repo_map.map_mul_no_files
         self.repo_map.map_mul_no_files = 1.0
 
+    def run(self, ticket_content):
+        initial_plan = self.generate_initial_plan(ticket_content)
+
+        files_to_edit = self.identify_affected_files(initial_plan)
+
+        final_plan = self.generate_final_plan(ticket_content, initial_plan, files_to_edit)
+
+        self.io.tool_output(
+            f"Frtom the ticket provided, here is hwo I would implement this feature:\n{final_plan}"
+        )
+
     def generate_initial_plan(self, ticket_content):
         message = (
             "Please create an initial implementation plan for this JIRA"
@@ -80,7 +91,7 @@ class PlanCoder(Coder):
                 "Could not determine number of steps, returning all files at once."
             )
             message = (
-                "Please, detetermine the specific files thhat wuld need editing to implement the"
+                "Please, detetermine the specific files that would need editing to implement the"
                 " plan below:\n\n"
                 + initial_plan
             )
