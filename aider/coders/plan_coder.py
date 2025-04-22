@@ -29,7 +29,7 @@ class PlanCoder(Coder):
         final_plan = self.generate_final_plan(ticket_content, initial_plan, files_to_edit)
 
         self.io.tool_output(
-            f"Frtom the ticket provided, here is hwo I would implement this feature:\n{final_plan}"
+            f"From the ticket provided, here is how I would implement this feature:\n{final_plan}"
         )
 
     def generate_initial_plan(self, ticket_content):
