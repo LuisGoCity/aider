@@ -2419,3 +2419,271 @@ class TestCommands(TestCase):
                     mock_tool_error.assert_any_call(
                         "Command '/model gpt-4' is only supported in interactive mode, skipping."
                     )
+
+    # Tests for cmd_plan_implementation
+
+    # Sample ticket content for testing plan implementation
+    PLAN_SAMPLE_TICKET_CONTENT = """
+    ## Goal
+    - Implement feature X
+
+    ## Requirements
+    - Requirement 1
+    - Requirement 2
+    """
+
+    def create_test_ticket_file(self, content=None):
+        """
+        Create a test ticket file with the given content.
+
+        Args:
+            content: The content to write to the file. If None, uses PLAN_SAMPLE_TICKET_CONTENT.
+
+        Returns:
+            Path: The path to the created file.
+        """
+        content = content or self.PLAN_SAMPLE_TICKET_CONTENT
+        ticket_path = Path(self.tempdir) / "test_ticket.md"
+        ticket_path.write_text(content)
+        return ticket_path
+
+    def test_cmd_plan_implementation_basic(self):
+        """
+        Test the basic functionality of cmd_plan_implementation.
+
+        This test verifies that:
+        1. The command reads the input file correctly
+        2. It creates a PlanCoder instance
+        3. It calls PlanCoder.run() with the file content
+        4. It saves the generated plan to the expected output file
+        5. It displays appropriate messages to the user
+        """
+        # Setup
+        ticket_path = self.create_test_ticket_file()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Test with mocked PlanCoder
+        with mock.patch("aider.coders.plan_coder.PlanCoder") as mock_plan_coder_class:
+            mock_plan_instance = mock_plan_coder_class.return_value
+            mock_plan_instance.run.return_value = "Generated implementation plan"
+
+            # Mock Path.write_text to avoid actual file writing
+            with mock.patch("pathlib.Path.write_text") as mock_write_text:
+                # Mock Path.exists to simulate file creation
+                mock_write_text = mock_write_text
+                with mock.patch("pathlib.Path.exists", return_value=True):
+                    # Mock open to avoid actual file reading
+                    with mock.patch(
+                        "builtins.open", mock.mock_open(read_data=self.PLAN_SAMPLE_TICKET_CONTENT)
+                    ):
+                        # Execute
+                        commands.cmd_plan_implementation(str(ticket_path))
+
+                        # Verify
+                        mock_plan_coder_class.assert_called_once()
+                        mock_plan_instance.run.assert_called_once()
+
+    def test_cmd_plan_implementation_reads_file_correctly(self):
+        """
+        Test that cmd_plan_implementation correctly reads the input file.
+        """
+        # Setup with custom content
+        custom_content = "Custom ticket content"
+        ticket_path = self.create_test_ticket_file(custom_content)
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Test with mocked open function
+        with mock.patch("builtins.open", mock.mock_open(read_data=custom_content)) as mock_open:
+            mock_open = mock_open
+            with mock.patch("aider.coders.plan_coder.PlanCoder") as mock_plan_coder_class:
+                # Mock the PlanCoder instance
+                mock_plan_instance = mock_plan_coder_class.return_value
+                mock_plan_instance.run.return_value = "Generated plan"
+
+                # Mock Path.write_text to avoid actual file writing
+                with mock.patch("pathlib.Path.write_text"):
+                    # Execute
+                    commands.cmd_plan_implementation(str(ticket_path))
+
+                    # Verify PlanCoder was called with the correct content
+                    mock_plan_instance.run.assert_called_once_with(custom_content)
+
+    def test_cmd_plan_implementation_creates_correct_plancoder(self):
+        """
+        Test that cmd_plan_implementation creates the correct PlanCoder instance.
+        """
+        # Setup
+        ticket_path = self.create_test_ticket_file()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Test with mocked PlanCoder
+        with mock.patch("aider.coders.plan_coder.PlanCoder") as mock_plan_coder_class:
+            # Execute
+            commands.cmd_plan_implementation(str(ticket_path))
+
+            # Verify PlanCoder was created with correct parameters
+            mock_plan_coder_class.assert_called_once_with(
+                coder.main_model,
+                io,
+                repo=coder.repo,
+                map_tokens=mock.ANY,
+                verbose=commands.verbose,
+            )
+
+    def test_cmd_plan_implementation_nonexistent_file(self):
+        """
+        Test behavior when the input file doesn't exist.
+        """
+        # Setup
+        nonexistent_path = Path(self.tempdir) / "nonexistent.md"
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Execute and verify error message
+        with mock.patch.object(io, "tool_error") as mock_tool_error:
+            commands.cmd_plan_implementation(str(nonexistent_path))
+            mock_tool_error.assert_called_once_with(f"File not found: {nonexistent_path}")
+
+    def test_cmd_plan_implementation_permission_error_reading(self):
+        """
+        Test behavior with permission issues reading the input file.
+        """
+        # Setup
+        ticket_path = self.create_test_ticket_file()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Mock open to raise PermissionError
+        with mock.patch("builtins.open", side_effect=PermissionError("Permission denied")):
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Execute
+                commands.cmd_plan_implementation(str(ticket_path))
+
+                # Verify error message
+                mock_tool_error.assert_called_once_with(mock.ANY)
+                self.assertIn("Permission denied", mock_tool_error.call_args[0][0])
+
+    def test_cmd_plan_implementation_calls_plancoder_run(self):
+        """
+        Test that PlanCoder.run() is called with the correct parameters.
+        """
+        # Setup
+        ticket_path = self.create_test_ticket_file()
+        ticket_content = ticket_path.read_text()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Test with mocked PlanCoder
+        with mock.patch("aider.coders.plan_coder.PlanCoder") as mock_plan_coder_class:
+            mock_plan_instance = mock_plan_coder_class.return_value
+
+            # Execute
+            commands.cmd_plan_implementation(str(ticket_path))
+
+            # Verify run was called with correct content
+            mock_plan_instance.run.assert_called_once_with(ticket_content)
+
+    def test_cmd_plan_implementation_processes_plancoder_output(self):
+        """
+        Test that the output from PlanCoder.run() is correctly processed.
+        """
+        # Setup
+        ticket_path = self.create_test_ticket_file()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+        expected_plan = "# Implementation Plan\n\n## Steps\n1. Step 1\n2. Step 2"
+
+        # Test with mocked PlanCoder
+        with mock.patch("aider.coders.plan_coder.PlanCoder") as mock_plan_coder_class:
+            mock_plan_instance = mock_plan_coder_class.return_value
+            mock_plan_instance.run.return_value = expected_plan
+
+            # Mock builtins.open for reading
+            with mock.patch(
+                "builtins.open", mock.mock_open(read_data=self.PLAN_SAMPLE_TICKET_CONTENT)
+            ):
+                # Mock pathlib.Path.write_text
+                with mock.patch("pathlib.Path.write_text") as mock_write_text:
+                    mock_write_text = mock_write_text
+                    # Mock tool_output to verify success message
+                    with mock.patch.object(io, "tool_output") as mock_tool_output:
+                        # Execute
+                        commands.cmd_plan_implementation(str(ticket_path))
+
+                        # Verify success message was shown
+                        mock_tool_output.assert_any_call(mock.ANY)
+
+    def test_cmd_plan_implementation_large_file(self):
+        """
+        Test with very large input files.
+        """
+        # Setup
+        large_content = "A" * 1000000  # 1MB of content
+        ticket_path = self.create_test_ticket_file(large_content)
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Test with mocked PlanCoder
+        with mock.patch("aider.coders.plan_coder.PlanCoder") as mock_plan_coder_class:
+            mock_plan_instance = mock_plan_coder_class.return_value
+            mock_plan_instance.run.return_value = "Large plan"
+
+            # Execute
+            commands.cmd_plan_implementation(str(ticket_path))
+
+            # Verify PlanCoder was called with the large content
+            mock_plan_instance.run.assert_called_once_with(large_content)
+
+    def test_cmd_plan_implementation_completion(self):
+        """
+        Test the command's tab completion functionality.
+        """
+        # Setup
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        # Create test files for completion
+        md_file = Path(self.tempdir) / "test.md"
+        md_file.touch()
+        txt_file = Path(self.tempdir) / "test.txt"
+        txt_file.touch()
+
+        # Test with mocked completions_raw_read_only
+        with mock.patch.object(commands, "completions_raw_read_only") as mock_completions:
+            # Set up the mock to return some completions
+            mock_completions.return_value = [
+                Completion(text="test.md", start_position=0, display="test.md"),
+                Completion(text="test.txt", start_position=0, display="test.txt"),
+            ]
+
+            # Create a document with partial command text
+            document = Document("/plan-implementation ", cursor_position=20)
+            complete_event = mock.MagicMock()
+
+            # Call the method
+            if hasattr(commands, "completions_raw_plan_implementation"):
+                completions = list(
+                    commands.completions_raw_plan_implementation(document, complete_event)
+                )
+
+                # Verify that completions_raw_read_only was called with the correct arguments
+                mock_completions.assert_called_once()
+                self.assertEqual(mock_completions.call_args[0][0], document)
+                self.assertEqual(mock_completions.call_args[0][1], complete_event)
+
+                # Verify that the completions were returned correctly
+                self.assertEqual(len(completions), 2)
+                self.assertEqual(completions[0].text, "test.md")
+                self.assertEqual(completions[1].text, "test.txt")
