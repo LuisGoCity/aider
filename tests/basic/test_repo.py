@@ -510,8 +510,8 @@ class TestRepo(unittest.TestCase):
             default_branch = git_repo.get_default_branch()
             self.assertIsNotNone(default_branch)
             
-            # Mock git command execution to simulate git errors
-            with patch.object(raw_repo.git, 'execute', side_effect=git.exc.GitCommandError('rev-parse', 128)):
+            # Mock git.cmd.Git.execute to simulate git errors
+            with patch('git.cmd.Git.execute', side_effect=git.exc.GitCommandError('rev-parse', 128)):
                 # Replace the repo in git_repo with our mocked repo
                 git_repo.repo = raw_repo
                 
