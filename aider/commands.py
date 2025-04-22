@@ -367,18 +367,18 @@ class Commands:
         context_coder = Coder.create(
             io=self.io,
             from_coder=self.coder,
-            edit_format="context",
+            edit_format="ask",
             summarize_from_coder=False,
         )
 
         # Add prompt for description
         description_prompt = (
             "Based on the changes in this branch and the files added to chat, please generate a"
-            " detailed PR description that explains:\n- What changes were made \n- Why these"
-            " changes were made \n- Any important implementation details \n- Any testing"
-            f" considerations.\nCommit history: \n{commit_history}\n Format your response as a"
-            " markdown description suitable for a pull request. Exclude any explanations around"
-            " commitsadd plan.md files or similar."
+            " detailed PR description (without a title) that explains:\n- What changes were made"
+            " \n- Why these changes were made \n- Any important implementation details \n- Any"
+            f" testing considerations.\nCommit history: \n{commit_history}\n Format your response"
+            " as a markdown description suitable for a pull request. Exclude any explanations"
+            " around commitsadd plan.md files or similar."
         )
 
         # Run description and store output in variable
