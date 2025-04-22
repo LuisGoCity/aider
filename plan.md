@@ -6,25 +6,7 @@ specification files. The tests will verify the command's functionality, error ha
 
 ## Steps
 
-### 1. **Analyze the existing code structure**
-**Files to edit:** `tests/basic/test_commands.py`
-
-- Review the `cmd_plan_implementation` method in `commands.py` to understand:
-    - How it processes input file paths
-    - How it reads file content
-    - How it interacts with the `PlanCoder` class
-    - How it saves the generated implementation plan
-- Examine the `PlanCoder` class in `plan_coder.py` to understand:
-    - The initialization parameters
-    - The `run()` method and its return value
-    - How it generates implementation plans
-- Review existing test patterns in `test_commands.py` to:
-    - Understand the test class structure
-    - Identify common test fixtures and helper methods
-    - Determine how other command tests are organized
-    - Create a new test class or add to existing one for plan implementation tests
-
-### 2. **Create test fixtures**
+### 1.  **Create test fixtures**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
@@ -56,7 +38,7 @@ specification files. The tests will verify the command's functionality, error ha
           # Configure return values and behavior
       ```
 
-### 3. **Implement basic functionality tests**
+### 2. **Implement basic functionality tests**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
@@ -124,7 +106,7 @@ specification files. The tests will verify the command's functionality, error ha
               )
       ```
 
-### 4. **Implement error handling tests**
+### 3. **Implement error handling tests**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
@@ -182,7 +164,7 @@ specification files. The tests will verify the command's functionality, error ha
                   self.assertIn("Permission denied", self.mock_io.tool_error.call_args[0][0])
       ```
 
-### 5. **Implement integration tests with PlanCoder**
+### 4. **Implement integration tests with PlanCoder**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
@@ -228,7 +210,7 @@ specification files. The tests will verify the command's functionality, error ha
                   write_handle.write.assert_called_once_with(expected_plan)
       ```
 
-### 6. **Test edge cases**
+### 5. **Test edge cases**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
@@ -290,7 +272,7 @@ specification files. The tests will verify the command's functionality, error ha
               self.mock_io.tool_output.assert_any_call(f"Implementation plan saved to {output_path}")
       ```
 
-### 7. **Implement mock-based tests**
+### 6. **Implement mock-based tests**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
@@ -356,7 +338,7 @@ specification files. The tests will verify the command's functionality, error ha
                           self.mock_io.tool_error.assert_not_called()
       ```
 
-### 8. **Add test for command completion**
+### 7. **Add test for command completion**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
@@ -399,68 +381,7 @@ specification files. The tests will verify the command's functionality, error ha
                   self.assertEqual(completions[1].text, "test.txt")
       ```
 
-### 9. **Verify test coverage**
-**Files to edit:** `tests/basic/test_commands.py`
-
-- In `tests/basic/test_commands.py`:
-    - Add tests for any missing code paths:
-      ```python
-      def test_cmd_plan_implementation_with_exception_during_run(self):
-          # Setup
-          ticket_path = self.create_test_ticket_file()
-          commands = Commands(self.mock_io, self.mock_coder)
-          
-          # Test with PlanCoder that raises an exception
-          with mock.patch('aider.coders.plan_coder.PlanCoder') as mock_plan_coder_class:
-              mock_plan_instance = mock_plan_coder_class.return_value
-              mock_plan_instance.run.side_effect = Exception("Test exception")
-              
-              # Execute
-              commands.cmd_plan_implementation(str(ticket_path))
-              
-              # Verify error was reported
-              self.mock_io.tool_error.assert_called_once_with(mock.ANY)
-              self.assertIn("Test exception", self.mock_io.tool_error.call_args[0][0])
-      ```
-    - Test with different repository map configurations:
-      ```python
-      def test_cmd_plan_implementation_with_different_repo_map_configs(self):
-          # Setup
-          ticket_path = self.create_test_ticket_file()
-          
-          # Test cases with different repo_map configurations
-          test_cases = [
-              {"has_repo_map": True, "max_map_tokens": 1024},
-              {"has_repo_map": False, "max_map_tokens": None},
-          ]
-          
-          for case in test_cases:
-              with self.subTest(has_repo_map=case["has_repo_map"]):
-                  # Create mock coder with appropriate repo_map
-                  mock_coder = mock.MagicMock()
-                  if case["has_repo_map"]:
-                      mock_coder.repo_map = mock.MagicMock()
-                      mock_coder.repo_map.max_map_tokens = case["max_map_tokens"]
-                  else:
-                      mock_coder.repo_map = None
-                  
-                  commands = Commands(self.mock_io, mock_coder)
-                  
-                  # Test with mocked PlanCoder
-                  with mock.patch('aider.coders.plan_coder.PlanCoder') as mock_plan_coder_class:
-                      # Execute
-                      commands.cmd_plan_implementation(str(ticket_path))
-                      
-                      # Verify PlanCoder was created with correct map_tokens
-                      expected_map_tokens = case["max_map_tokens"] if case["has_repo_map"] else 1024
-                      mock_plan_coder_class.assert_called_once()
-                      self.assertEqual(
-                          mock_plan_coder_class.call_args[1]["map_tokens"],
-                          expected_map_tokens
-                      )
-      ```
-
-### 10. **Document the tests**
+### 9. **Document the tests**
 **Files to edit:** `tests/basic/test_commands.py`
 
 - In `tests/basic/test_commands.py`:
