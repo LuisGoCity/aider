@@ -561,3 +561,33 @@ class TestRepo(unittest.TestCase):
             
             # Verify it doesn't contain the initial commit (which is on both branches)
             self.assertNotIn("Initial commit", commit_history)
+            
+    def test_get_commit_history_error_handling(self):
+        """Test that get_commit_history handles errors gracefully"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+            
+            # Create a file to commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+            
+            # Test with non-existent branch
+            with self.assertRaises(git.exc.GitCommandError):
+                git_repo.get_commit_history("master", "non-existent-branch")
+            
+            # Mock git.cmd.Git.execute to simulate git errors
+            with patch('git.cmd.Git.execute', side_effect=git.exc.GitCommandError('log', 128)):
+                # Replace the repo in git_repo with our mocked repo
+                git_repo.repo = raw_repo
+                
+                # Method should raise the GitCommandError
+                with self.assertRaises(git.exc.GitCommandError):
+                    git_repo.get_commit_history("master", "feature")
