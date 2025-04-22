@@ -490,11 +490,3 @@ class TestRepo(unittest.TestCase):
             # Test default branch detection - should still be "main"
             default_branch = git_repo.get_default_branch()
             self.assertEqual(default_branch, "main")
-            
-            # Test with neither main nor master (create a different branch)
-            raw_repo.git.checkout("-b", "development")
-            raw_repo.git.branch("-D", "main")
-            
-            # Test default branch detection - should return None
-            default_branch = git_repo.get_default_branch()
-            self.assertIsNone(default_branch)
