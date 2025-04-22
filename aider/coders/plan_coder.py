@@ -27,10 +27,6 @@ class PlanCoder(Coder):
 
         files_to_edit = self.identify_affected_files(initial_plan)
         final_plan = self.generate_final_plan(ticket_content, initial_plan, files_to_edit)
-
-        self.io.tool_output(
-            f"From the ticket provided, here is how I would implement this feature:\n{final_plan}"
-        )
         return final_plan
 
     def generate_initial_plan(self, ticket_content):
@@ -45,13 +41,15 @@ class PlanCoder(Coder):
                 "Please create a more detailed implementation plan for this JIRA"
                 f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\nFor each step,"
                 " indicate what files will need editing (if any) based on the dictionary of"
-                f" identifiedfiles below:\n {json.dumps(affected_files)}"
+                f" identifiedfiles below:\n {json.dumps(affected_files)}. DO NOT WRITE CODE"
+                " SNIPPETS SHOWING HOW TO IMPLEMENT EACH STEP."
             )
         else:
             message = (
                 "Please create a more detailed implementation plan for this JIRA"
-                f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\n"
-                f"include a reference to the list of files below:\n {affected_files}."
+                f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\ninclude a"
+                f" reference to the list of files below:\n {affected_files}.DO NOT WRITE CODE"
+                " SNIPPETS SHOWING HOW TO IMPLEMENT EACH STEP."
             )
 
         self.run_one(message, preproc=False)
@@ -61,7 +59,7 @@ class PlanCoder(Coder):
         # First, ask the LLM to identify how many steps are in the plan
         message = (
             "How many distinct implementation steps are in this plan? Please respond with just an"
-            " integer corresponingto the number of steps:\n\n"
+            " integer corresponding to the number of steps:\n\n"
             + initial_plan
         )
 
