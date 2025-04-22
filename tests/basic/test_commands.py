@@ -2785,10 +2785,14 @@ class TestCommands(TestCase):
         coder = Coder.create(self.GPT35, None, io)
         commands = Commands(io, coder)
         
+        # Create a mock repo object
+        mock_repo = mock.MagicMock()
+        mock_repo.get_default_branch.return_value = None
+        coder.repo = mock_repo
+        
         with (
             mock.patch.object(commands, "_clear_chat_history"),
             mock.patch.object(commands, "_drop_all_files"),
-            mock.patch.object(coder.repo, "get_default_branch", return_value=None),
             mock.patch.object(io, "tool_error") as mock_tool_error,
         ):
             commands.cmd_raise_pr()
