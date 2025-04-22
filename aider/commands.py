@@ -360,12 +360,100 @@ class Commands:
         self.io.tool_output("Generating PR description based on changes...")
 
         self.cmd_add(" ".join(changed_files))
-        # instantiate context coder
-        # add prompt for descrpition
-        # run descrpition and store output in variable
-        # run another context instance to generate pr title based on description
-        # raise pr
-        return commit_history
+        self.io.tool_output("Generating PR description based on changes...")
+    
+        # Instantiate context coder
+        from aider.coders.base_coder import Coder
+    
+        context_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format="context",
+            summarize_from_coder=False,
+        )
+    
+        # Add prompt for description
+        description_prompt = f"""
+    Based on the changes in this branch, please generate a detailed PR description that explains:
+    - What changes were made
+    - Why these changes were made
+    - Any important implementation details
+    - Any testing considerations
+
+    Commit history:
+    {commit_history}
+
+    Format your response as a markdown description suitable for a pull request.
+    """
+    
+        # Run description and store output in variable
+        pr_description = context_coder.run(description_prompt)
+    
+        # Run another context instance to generate PR title based on description
+        title_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format="context",
+            summarize_from_coder=False,
+        )
+    
+        title_prompt = f"""
+    Based on this PR description, generate a concise, descriptive title (one line):
+
+    {pr_description}
+
+    Return only the title text, nothing else.
+    """
+    
+        pr_title = title_coder.run(title_prompt).strip()
+    
+        # Raise PR
+        self.io.tool_output(f"Generated PR title: {pr_title}")
+    
+        # Save PR description to a temporary file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.md') as temp_file:
+            temp_file.write(pr_description)
+            pr_desc_file = temp_file.name
+    
+        # Check if GitHub CLI is available
+        gh_available = False
+        try:
+            subprocess.run(["gh", "--version"], check=True, capture_output=True)
+            gh_available = True
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+    
+        if gh_available:
+            if self.io.confirm_ask("Would you like to create this PR now?", default="y"):
+                cmd = [
+                    "gh", "pr", "create",
+                    "--title", pr_title,
+                    "--body-file", pr_desc_file,
+                    "--base", default_branch
+                ]
+            
+                # Add optional arguments from command
+                if args.strip():
+                    cmd.extend(args.strip().split())
+            
+                result = subprocess.run(cmd, capture_output=True, text=True)
+            
+                if result.returncode == 0:
+                    pr_url = result.stdout.strip()
+                    self.io.tool_output(f"PR created successfully: {pr_url}")
+                
+                    # Offer to open the PR URL
+                    self.io.offer_url(pr_url, "Open the PR in your browser?")
+                else:
+                    self.io.tool_error(f"Failed to create PR: {result.stderr}")
+                    self.io.tool_output(f"PR description saved to: {pr_desc_file}")
+            else:
+                self.io.tool_output("PR creation cancelled.")
+                self.io.tool_output(f"PR description saved to: {pr_desc_file}")
+        else:
+            self.io.tool_error("GitHub CLI (gh) not found. Please install it to create PRs.")
+            self.io.tool_output(f"PR description saved to: {pr_desc_file}")
+            self.io.tool_output("You can create the PR manually using this description.")
 
     def cmd_lint(self, args="", fnames=None):
         "Lint and fix in-chat files or all dirty files if none in chat"
