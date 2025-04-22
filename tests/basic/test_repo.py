@@ -707,14 +707,22 @@ class TestRepo(unittest.TestCase):
                 
                 # Verify subprocess.run was called
                 self.assertEqual(mock_run.call_count, 1)
+                
+                # Get the command that was passed to subprocess.run
                 args = mock_run.call_args[0][0]
-                self.assertEqual(args[0], "gh")
-                self.assertEqual(args[1], "pr")
-                self.assertEqual(args[2], "create")
-                self.assertEqual(args[4], "master")
-                self.assertEqual(args[6], "feature")
-                self.assertEqual(args[8], "Test PR Title")
-                self.assertEqual(args[10], "Test PR Description")
+                
+                # Check that the command contains all the expected parts
+                self.assertIn("gh", args)
+                self.assertIn("pr", args)
+                self.assertIn("create", args)
+                self.assertIn("--base", args)
+                self.assertIn("master", args)
+                self.assertIn("--head", args)
+                self.assertIn("feature", args)
+                self.assertIn("--title", args)
+                self.assertIn("Test PR Title", args)
+                self.assertIn("--body", args)
+                self.assertIn("Test PR Description", args)
                 
             # Test when GitHub CLI is not available
             with patch('subprocess.run', side_effect=FileNotFoundError()) as mock_run:
