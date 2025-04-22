@@ -2805,15 +2805,15 @@ class TestCommands(TestCase):
         coder = Coder.create(self.GPT35, None, io)
         commands = Commands(io, coder)
         
+        # Create a mock repo object
+        mock_repo = mock.MagicMock()
+        mock_repo.get_default_branch.return_value = "main"
+        mock_repo.get_commit_history.side_effect = git.exc.GitCommandError("git log", 128)
+        coder.repo = mock_repo
+        
         with (
             mock.patch.object(commands, "_clear_chat_history"),
             mock.patch.object(commands, "_drop_all_files"),
-            mock.patch.object(coder.repo, "get_default_branch", return_value="main"),
-            mock.patch.object(
-                coder.repo, 
-                "get_commit_history", 
-                side_effect=git.exc.GitCommandError("git log", 128)
-            ),
             mock.patch.object(io, "tool_error") as mock_tool_error,
         ):
             commands.cmd_raise_pr()
@@ -2826,16 +2826,16 @@ class TestCommands(TestCase):
         coder = Coder.create(self.GPT35, None, io)
         commands = Commands(io, coder)
         
+        # Create a mock repo object
+        mock_repo = mock.MagicMock()
+        mock_repo.get_default_branch.return_value = "main"
+        mock_repo.get_commit_history.return_value = "commit1\ncommit2"
+        mock_repo.get_changed_files.side_effect = git.exc.GitCommandError("git diff", 128)
+        coder.repo = mock_repo
+        
         with (
             mock.patch.object(commands, "_clear_chat_history"),
             mock.patch.object(commands, "_drop_all_files"),
-            mock.patch.object(coder.repo, "get_default_branch", return_value="main"),
-            mock.patch.object(coder.repo, "get_commit_history", return_value="commit1\ncommit2"),
-            mock.patch.object(
-                coder.repo, 
-                "get_changed_files", 
-                side_effect=git.exc.GitCommandError("git diff", 128)
-            ),
             mock.patch.object(io, "tool_error") as mock_tool_error,
         ):
             commands.cmd_raise_pr()
