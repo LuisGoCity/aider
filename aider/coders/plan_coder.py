@@ -55,22 +55,46 @@ class PlanCoder(Coder):
             map_tokens=self.repo_map.max_map_tokens if self.repo_map else 1024,
             verbose=self.verbose,
         )
-
-        # Use the context_coder to identify relevant files
+        
+        # First, ask the LLM to identify how many steps are in the plan
         message = (
-            "Based on the implementation plan below, identify all files that will need to be"
-            " modified or created to implement this plan. List only the file paths, one per"
-            " line:\n\n"
+            "How many distinct implementation steps are in this plan? Please respond with just a number:\n\n"
             + initial_plan
         )
-
-        # Run the context_coder with our message
-        context_coder.run_one(message, preproc=False)
-
-        # After running, the context_coder will have identified files in its abs_fnames set
-        # We need to convert these to relative paths
-        identified_files = [
-            context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames
-        ]
-
-        return identified_files
+        
+        self.run_one(message, preproc=False)
+        
+        # Extract the number from the response
+        try:
+            num_steps = int(''.join(filter(str.isdigit, self.partial_response_content.strip())))
+            if num_steps <= 0:
+                num_steps = 1  # Fallback to at least one step
+        except (ValueError, TypeError):
+            self.io.tool_warning("Could not determine number of steps, defaulting to 1")
+            num_steps = 1
+        
+        self.io.tool_output(f"Identified {num_steps} implementation steps")
+        
+        all_identified_files = set()
+        
+        # Make one call per step
+        for step_num in range(1, num_steps + 1):
+            self.io.tool_output(f"Identifying files for step {step_num} of {num_steps}...")
+            
+            # Use the context_coder to identify relevant files for this step
+            message = (
+                f"For step {step_num} of the implementation plan below, identify all files that will need to be "
+                f"modified or created. List only the file paths, one per line:\n\n{initial_plan}"
+            )
+            
+            # Run the context_coder with our message
+            context_coder.run_one(message, preproc=False)
+            
+            # Add the identified files to our set
+            step_files = {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
+            all_identified_files.update(step_files)
+            
+            # Clear the context_coder's files for the next step
+            context_coder.abs_fnames.clear()
+        
+        return sorted(list(all_identified_files))
