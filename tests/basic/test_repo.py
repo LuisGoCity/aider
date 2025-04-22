@@ -453,3 +453,48 @@ class TestRepo(unittest.TestCase):
             # Verify the commit was actually made
             latest_commit_msg = raw_repo.head.commit.message
             self.assertEqual(latest_commit_msg.strip(), "Should succeed")
+            
+    def test_get_default_branch(self):
+        """Test that get_default_branch correctly identifies main or master as the default branch"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            
+            # Create a file to commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            
+            # Do the initial commit on master branch (default for git init)
+            raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+            
+            # Test default branch detection - should be "master" initially
+            default_branch = git_repo.get_default_branch()
+            self.assertEqual(default_branch, "master")
+            
+            # Create and switch to "main" branch
+            raw_repo.git.branch("main")
+            raw_repo.git.checkout("main")
+            
+            # Test default branch detection again - should still find "master" first
+            # since both branches exist and "main" is checked alphabetically first
+            default_branch = git_repo.get_default_branch()
+            self.assertEqual(default_branch, "main")
+            
+            # Delete master branch to test only main exists
+            raw_repo.git.branch("-D", "master")
+            
+            # Test default branch detection - should be "main" now
+            default_branch = git_repo.get_default_branch()
+            self.assertEqual(default_branch, "main")
+            
+            # Test with neither main nor master (create a different branch)
+            raw_repo.git.checkout("-b", "development")
+            raw_repo.git.branch("-D", "main")
+            
+            # Test default branch detection - should return None
+            default_branch = git_repo.get_default_branch()
+            self.assertIsNone(default_branch)
