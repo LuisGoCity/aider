@@ -354,106 +354,44 @@ class Commands:
             self.io.tool_error("Could not determine default branch (main or master).")
             return
 
-        self.io.tool_output(f"Creating PR from branch '{current_branch}' to '{default_branch}'...")
+        self.io.tool_output(
+            f"Creating PR from branch '{current_branch}' to '{default_branch}' based on changes..."
+        )
         commit_history = self.coder.repo.get_commit_history(default_branch, current_branch)
         changed_files = self.coder.repo.get_changed_files(default_branch, current_branch)
-        self.io.tool_output("Generating PR description based on changes...")
-
         self.cmd_add(" ".join(changed_files))
-        self.io.tool_output("Generating PR description based on changes...")
-    
+
         # Instantiate context coder
         from aider.coders.base_coder import Coder
-    
+
         context_coder = Coder.create(
             io=self.io,
             from_coder=self.coder,
             edit_format="context",
             summarize_from_coder=False,
         )
-    
+
         # Add prompt for description
-        description_prompt = f"""
-    Based on the changes in this branch, please generate a detailed PR description that explains:
-    - What changes were made
-    - Why these changes were made
-    - Any important implementation details
-    - Any testing considerations
+        description_prompt = (
+            "Based on the changes in this branch and the files added to chat, please generate a"
+            " detailed PR description that explains:\n- What changes were made \n- Why these"
+            " changes were made \n- Any important implementation details \n- Any testing"
+            f" considerations.\nCommit history: \n{commit_history}\n Format your response as a"
+            " markdown description suitable for a pull request. Exclude any explanations around"
+            " commitsadd plan.md files or similar."
+        )
 
-    Commit history:
-    {commit_history}
-
-    Format your response as a markdown description suitable for a pull request.
-    """
-    
         # Run description and store output in variable
         pr_description = context_coder.run(description_prompt)
-    
-        # Run another context instance to generate PR title based on description
-        title_coder = Coder.create(
-            io=self.io,
-            from_coder=self.coder,
-            edit_format="context",
-            summarize_from_coder=False,
+
+        title_prompt = (
+            "Based on this PR description, generate a concise, descriptive title (one line):\n"
+            f"{pr_description}\n Return only the title text, nothing else."
         )
-    
-        title_prompt = f"""
-    Based on this PR description, generate a concise, descriptive title (one line):
 
-    {pr_description}
+        pr_title = context_coder.run(title_prompt).strip()
 
-    Return only the title text, nothing else.
-    """
-    
-        pr_title = title_coder.run(title_prompt).strip()
-    
-        # Raise PR
-        self.io.tool_output(f"Generated PR title: {pr_title}")
-    
-        # Save PR description to a temporary file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.md') as temp_file:
-            temp_file.write(pr_description)
-            pr_desc_file = temp_file.name
-    
-        # Check if GitHub CLI is available
-        gh_available = False
-        try:
-            subprocess.run(["gh", "--version"], check=True, capture_output=True)
-            gh_available = True
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            pass
-    
-        if gh_available:
-            if self.io.confirm_ask("Would you like to create this PR now?", default="y"):
-                cmd = [
-                    "gh", "pr", "create",
-                    "--title", pr_title,
-                    "--body-file", pr_desc_file,
-                    "--base", default_branch
-                ]
-            
-                # Add optional arguments from command
-                if args.strip():
-                    cmd.extend(args.strip().split())
-            
-                result = subprocess.run(cmd, capture_output=True, text=True)
-            
-                if result.returncode == 0:
-                    pr_url = result.stdout.strip()
-                    self.io.tool_output(f"PR created successfully: {pr_url}")
-                
-                    # Offer to open the PR URL
-                    self.io.offer_url(pr_url, "Open the PR in your browser?")
-                else:
-                    self.io.tool_error(f"Failed to create PR: {result.stderr}")
-                    self.io.tool_output(f"PR description saved to: {pr_desc_file}")
-            else:
-                self.io.tool_output("PR creation cancelled.")
-                self.io.tool_output(f"PR description saved to: {pr_desc_file}")
-        else:
-            self.io.tool_error("GitHub CLI (gh) not found. Please install it to create PRs.")
-            self.io.tool_output(f"PR description saved to: {pr_desc_file}")
-            self.io.tool_output("You can create the PR manually using this description.")
+        self.coder.repo.raise_pr(default_branch, current_branch, pr_title, pr_description)
 
     def cmd_lint(self, args="", fnames=None):
         "Lint and fix in-chat files or all dirty files if none in chat"
