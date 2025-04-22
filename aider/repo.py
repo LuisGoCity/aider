@@ -1,4 +1,5 @@
 import os
+import subprocess
 import time
 from pathlib import Path, PurePosixPath
 
@@ -497,3 +498,39 @@ class GitRepo:
             ).splitlines()
         except ANY_GIT_ERROR as e:
             raise e
+
+    def raise_pr(self, base_branch, compare_branch, pr_title, pr_description):
+        """Raise a PR via the git cli."""
+        # Check if GitHub CLI is available
+        gh_available = False
+        try:
+            subprocess.run(["gh", "--version"], check=True, capture_output=True)
+            gh_available = True
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+
+        if gh_available:
+            cmd = [
+                "gh",
+                "pr",
+                "create",
+                "--base",
+                base_branch,
+                "--head",
+                compare_branch,
+                "--title",
+                pr_title,
+                "--body",
+                pr_description,
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                pr_url = result.stdout.strip()
+                self.io.tool_output(f"PR created successfully: {pr_url}")
+            else:
+                self.io.tool_error(f"Failed to create PR: {result.stderr}")
+        else:
+            self.io.tool_error("GitHub CLI (gh) not found. Please install it to create PRs.")
+            self.io.tool_output("You can create the PR manually using this description.")
