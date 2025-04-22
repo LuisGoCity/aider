@@ -1,0 +1,161 @@
+commit c2d2ae097782602f36a9eed1781bc96a5bfc7b26
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:58:43 2025 +0100
+
+    fix linking issues
+
+commit 7887fbbe103ee90a1789070c9ac31c5dfbe77f5e
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:47:34 2025 +0100
+
+    fix: Update test_commands.py to mock file reading in tests
+
+commit e43e9c0fb6120510c6986f717731f9aec80de01a
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:40:35 2025 +0100
+
+    fix: Update test_commands.py to improve mocking and error handling
+
+commit a8d4cd988199546926063b2e9090c890d3930386
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:35:32 2025 +0100
+
+    fix: Update test_commands.py to use proper mocking and input setup
+
+commit 71d18922489afe3d1113dad3249bd79e050705f6
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:35:26 2025 +0100
+
+    feat: add comprehensive tests for cmd_plan_implementation in test_commands.py
+
+commit 91716b55a1fe891502656461d9844918c760295e
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:29:42 2025 +0100
+
+    update prompt
+
+commit 725d07eb828150dc6e0c1d43e1caa9ef85ff4241
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:13:07 2025 +0100
+
+    update plan
+
+commit 7d433385c87b8da1db54412943f435e5fc3fb811
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:06:25 2025 +0100
+
+    add generated plan for testing plan generation
+
+commit 20994b655e8f841e3f485544b121b38893f23f96
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 13:04:53 2025 +0100
+
+    change prompt and stop outputting final plan
+
+commit f1332e691178d1aaa16f09778bf9e21331e41434
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:43:12 2025 +0100
+
+    use autoconfirm ask in plan coder
+
+commit aec229c6ff71694a48209086799442046f92f0bc
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:37:38 2025 +0100
+
+    fix bug
+
+commit 83beb99c7b98b840d7c04f5aacddeef595cbf16f
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:20:50 2025 +0100
+
+    change save_path
+
+commit 4bcb440104f614d896f91d4e714ed56eb8e62aba
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:16:57 2025 +0100
+
+    add command
+
+commit 511c68618f4a81cb436838445c13eb911c56fa0d
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:13:53 2025 +0100
+
+    feat: add implementation plan generation command with file output
+
+commit 0437095a68a99a66e6ee929b2b4f155d32b8e189
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:13:50 2025 +0100
+
+    feat: add placeholder for plan implementation command
+
+commit 1f194ea1d68bc5c3a88f411334a78b18e4020928
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:09:29 2025 +0100
+
+    re-write messages
+
+commit c008b21b1b97c6a76a71f039598c4a301d22b7a4
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 12:04:20 2025 +0100
+
+    refactor: Update `generate_final_plan` to handle both dict and set/list of affected files
+
+commit ec547851a48f5bc93b780dda0d4167294c105a6e
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 11:47:16 2025 +0100
+
+    add run method
+
+commit c1818f50b235642554f6ddf34a5bd688884fdaf7
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 11:41:20 2025 +0100
+
+    delete unrecheable return
+
+commit 5f305d3d78fd9fa052cf226bb127302ee18c5b2b
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 11:40:53 2025 +0100
+
+    handle exception idfferently
+
+commit 1a74f79e50bb9885fc0e80ce090e78ca3eaf2f4c
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 11:35:38 2025 +0100
+
+    refactor code
+
+commit d6d06bf18f974ff019403c3fcc1924db4bd24655
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 11:25:34 2025 +0100
+
+    refactor code
+
+commit fe06cdc777c479f6b247f8ce86fcded2e1b214a0
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 11:14:58 2025 +0100
+
+    refactor: Modify `identify_affected_files` to make multiple LLM calls per step
+
+commit 9b53a781012bddfa0b64ef2cb03856c9fbf30ab6
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 10:58:30 2025 +0100
+
+    refactor: update `generate_final_plan` to use `run_one` for consistent message handling
+
+commit 981a9a9335c6b4f1154dfbae712d0c00625ec912
+Author: LuisGoCity (aider) <luis.lopez@gocity.com>
+Date:   Tue Apr 22 10:56:14 2025 +0100
+
+    feat: Use run_one method for generating initial implementation plan
+
+commit 805bac9162faf27b47e77db7d4718a7e8fdbf17e
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Tue Apr 22 10:51:16 2025 +0100
+
+    add plan_coder
+
+commit 3b9d248f97bb08af60e8b6b3e42aea09167c70ba
+Author: LuisGoCity <luis.lopez@gocity.com>
+Date:   Mon Apr 21 18:07:44 2025 +0100
+
+    add plan_prompts
