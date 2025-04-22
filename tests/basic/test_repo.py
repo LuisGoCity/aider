@@ -705,8 +705,8 @@ class TestRepo(unittest.TestCase):
                     "Test PR Description"
                 )
                 
-                # Verify subprocess.run was called with correct arguments
-                mock_run.assert_called_once()
+                # Verify subprocess.run was called
+                self.assertEqual(mock_run.call_count, 1)
                 args = mock_run.call_args[0][0]
                 self.assertEqual(args[0], "gh")
                 self.assertEqual(args[1], "pr")
