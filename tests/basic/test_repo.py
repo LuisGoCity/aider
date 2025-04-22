@@ -518,3 +518,43 @@ class TestRepo(unittest.TestCase):
                 # Method should return None when both branch checks fail
                 default_branch = git_repo.get_default_branch()
                 self.assertIsNone(default_branch)
+                
+    def test_get_commit_history(self):
+        """Test that get_commit_history correctly returns commit history between branches"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+            
+            # Create a file and make initial commit on main branch
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+            
+            # Make changes and commits on feature branch
+            fname.write_text("feature change 1")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature commit 1")
+            
+            fname.write_text("feature change 2")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature commit 2")
+            
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+            
+            # Get commit history between main and feature
+            commit_history = git_repo.get_commit_history("main", "feature")
+            
+            # Verify commit history contains our commit messages
+            self.assertIn("Feature commit 1", commit_history)
+            self.assertIn("Feature commit 2", commit_history)
+            
+            # Verify it doesn't contain the initial commit (which is on both branches)
+            self.assertNotIn("Initial commit", commit_history)
