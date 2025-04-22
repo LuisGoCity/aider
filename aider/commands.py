@@ -360,9 +360,13 @@ class Commands:
         self.io.tool_output(
             f"Creating PR from branch '{current_branch}' to '{default_branch}' based on changes..."
         )
-        commit_history = self.coder.repo.get_commit_history(default_branch, current_branch)
-        changed_files = self.coder.repo.get_changed_files(default_branch, current_branch)
-        self.cmd_add(" ".join(changed_files))
+        try:
+            commit_history = self.coder.repo.get_commit_history(default_branch, current_branch)
+            changed_files = self.coder.repo.get_changed_files(default_branch, current_branch)
+            self.cmd_add(" ".join(changed_files))
+        except ANY_GIT_ERROR as err:
+            self.io.tool_error(f"Unable to complete raise_pr: {err}")
+            return
 
         # Instantiate context coder
         from aider.coders.base_coder import Coder
