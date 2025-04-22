@@ -2480,16 +2480,18 @@ class TestCommands(TestCase):
             with mock.patch("pathlib.Path.write_text") as mock_write_text:
                 # Mock Path.exists to simulate file creation
                 with mock.patch("pathlib.Path.exists", return_value=True):
-                    # Execute
-                    commands.cmd_plan_implementation(str(ticket_path))
+                    # Mock open to avoid actual file reading
+                    with mock.patch("builtins.open", mock.mock_open(read_data=self.PLAN_SAMPLE_TICKET_CONTENT)):
+                        # Execute
+                        commands.cmd_plan_implementation(str(ticket_path))
 
-                    # Verify
-                    mock_plan_coder_class.assert_called_once()
-                    mock_plan_instance.run.assert_called_once()
-                    
-                    # Check that write_text was called with the correct content
-                    output_path = Path(str(ticket_path).replace(".md", "_implementation_plan.md"))
-                    mock_write_text.assert_called_once_with("Generated implementation plan")
+                        # Verify
+                        mock_plan_coder_class.assert_called_once()
+                        mock_plan_instance.run.assert_called_once()
+                        
+                        # Check that write_text was called with the correct content
+                        output_path = Path(str(ticket_path).replace(".md", "_implementation_plan.md"))
+                        mock_write_text.assert_called_once_with("Generated implementation plan")
 
     def test_cmd_plan_implementation_reads_file_correctly(self):
         """
@@ -2516,6 +2518,9 @@ class TestCommands(TestCase):
 
                     # Verify file was read
                     mock_open.assert_called_with(ticket_path, "r", encoding=mock.ANY, errors=mock.ANY)
+                    
+                    # Verify PlanCoder was called with the correct content
+                    mock_plan_instance.run.assert_called_once_with(custom_content)
 
     def test_cmd_plan_implementation_creates_correct_plancoder(self):
         """
@@ -2591,15 +2596,17 @@ class TestCommands(TestCase):
             mock_plan_instance = mock_plan_coder_class.return_value
             mock_plan_instance.run.return_value = "Generated implementation plan"
 
-            # Mock pathlib.Path.write_text to raise PermissionError
-            with mock.patch("pathlib.Path.write_text", side_effect=PermissionError("Permission denied")):
-                with mock.patch.object(io, "tool_error") as mock_tool_error:
-                    # Execute
-                    commands.cmd_plan_implementation(str(ticket_path))
+            # Mock builtins.open for reading
+            with mock.patch("builtins.open", mock.mock_open(read_data=self.PLAN_SAMPLE_TICKET_CONTENT)):
+                # Mock pathlib.Path.write_text to raise PermissionError
+                with mock.patch("pathlib.Path.write_text", side_effect=PermissionError("Permission denied")):
+                    with mock.patch.object(io, "tool_error") as mock_tool_error:
+                        # Execute
+                        commands.cmd_plan_implementation(str(ticket_path))
 
-                    # Verify error message
-                    mock_tool_error.assert_called_once_with(mock.ANY)
-                    self.assertIn("Permission denied", mock_tool_error.call_args[0][0])
+                        # Verify error message
+                        mock_tool_error.assert_called_once_with(mock.ANY)
+                        self.assertIn("Permission denied", mock_tool_error.call_args[0][0])
 
     def test_cmd_plan_implementation_calls_plancoder_run(self):
         """
@@ -2638,18 +2645,20 @@ class TestCommands(TestCase):
             mock_plan_instance = mock_plan_coder_class.return_value
             mock_plan_instance.run.return_value = expected_plan
 
-            # Mock pathlib.Path.write_text
-            with mock.patch("pathlib.Path.write_text") as mock_write_text:
-                # Mock tool_output to verify success message
-                with mock.patch.object(io, "tool_output") as mock_tool_output:
-                    # Execute
-                    commands.cmd_plan_implementation(str(ticket_path))
+            # Mock builtins.open for reading
+            with mock.patch("builtins.open", mock.mock_open(read_data=self.PLAN_SAMPLE_TICKET_CONTENT)):
+                # Mock pathlib.Path.write_text
+                with mock.patch("pathlib.Path.write_text") as mock_write_text:
+                    # Mock tool_output to verify success message
+                    with mock.patch.object(io, "tool_output") as mock_tool_output:
+                        # Execute
+                        commands.cmd_plan_implementation(str(ticket_path))
 
-                    # Verify output was written correctly
-                    mock_write_text.assert_called_once_with(expected_plan)
-                    
-                    # Verify success message was shown
-                    mock_tool_output.assert_any_call(mock.ANY)
+                        # Verify output was written correctly
+                        mock_write_text.assert_called_once_with(expected_plan)
+                        
+                        # Verify success message was shown
+                        mock_tool_output.assert_any_call(mock.ANY)
 
     def test_cmd_plan_implementation_empty_file(self):
         """
@@ -2666,16 +2675,18 @@ class TestCommands(TestCase):
             mock_plan_instance = mock_plan_coder_class.return_value
             mock_plan_instance.run.return_value = "Empty plan"
 
-            # Mock Path.write_text to avoid actual file writing
-            with mock.patch("pathlib.Path.write_text") as mock_write_text:
-                # Execute
-                commands.cmd_plan_implementation(str(ticket_path))
+            # Mock builtins.open for reading with empty content
+            with mock.patch("builtins.open", mock.mock_open(read_data="")):
+                # Mock Path.write_text to avoid actual file writing
+                with mock.patch("pathlib.Path.write_text") as mock_write_text:
+                    # Execute
+                    commands.cmd_plan_implementation(str(ticket_path))
 
-                # Verify PlanCoder was still called with empty string
-                mock_plan_instance.run.assert_called_once_with("")
-                
-                # Verify write_text was called with the correct content
-                mock_write_text.assert_called_once_with("Empty plan")
+                    # Verify PlanCoder was still called with empty string
+                    mock_plan_instance.run.assert_called_once_with("")
+                    
+                    # Verify write_text was called with the correct content
+                    mock_write_text.assert_called_once_with("Empty plan")
 
     def test_cmd_plan_implementation_large_file(self):
         """
@@ -2715,18 +2726,20 @@ class TestCommands(TestCase):
             mock_plan_instance = mock_plan_coder_class.return_value
             mock_plan_instance.run.return_value = "Special plan"
 
-            # Mock Path.write_text to avoid actual file writing
-            with mock.patch("pathlib.Path.write_text") as mock_write_text:
-                # Execute
-                with mock.patch.object(io, "tool_output") as mock_tool_output:
-                    commands.cmd_plan_implementation(str(special_path))
+            # Mock builtins.open for reading
+            with mock.patch("builtins.open", mock.mock_open(read_data=self.PLAN_SAMPLE_TICKET_CONTENT)):
+                # Mock Path.write_text to avoid actual file writing
+                with mock.patch("pathlib.Path.write_text") as mock_write_text:
+                    # Execute
+                    with mock.patch.object(io, "tool_output") as mock_tool_output:
+                        commands.cmd_plan_implementation(str(special_path))
 
-                    # Verify output path is correctly generated
-                    output_path = Path(str(special_path).replace(".md", "_implementation_plan.md"))
-                    mock_tool_output.assert_any_call(f"Implementation plan saved to {output_path}")
-                    
-                    # Verify write_text was called with the correct content
-                    mock_write_text.assert_called_once_with("Special plan")
+                        # Verify output path is correctly generated
+                        output_path = Path(str(special_path).replace(".md", "_implementation_plan.md"))
+                        mock_tool_output.assert_any_call(f"Implementation plan saved to {output_path}")
+                        
+                        # Verify write_text was called with the correct content
+                        mock_write_text.assert_called_once_with("Special plan")
 
     def test_cmd_plan_implementation_with_mocked_file_operations(self):
         """
@@ -2743,7 +2756,7 @@ class TestCommands(TestCase):
         mock_plan = "Mocked implementation plan"
 
         # Mock both file operations and PlanCoder
-        with mock.patch("builtins.open", mock.mock_open(read_data=mock_content)):
+        with mock.patch("builtins.open", mock.mock_open(read_data=mock_content)) as mock_open:
             with mock.patch("aider.coders.plan_coder.PlanCoder") as mock_plan_coder_class:
                 mock_plan_instance = mock_plan_coder_class.return_value
                 mock_plan_instance.run.return_value = mock_plan
@@ -2756,6 +2769,7 @@ class TestCommands(TestCase):
                             commands.cmd_plan_implementation(str(ticket_path))
 
                             # Verify
+                            mock_open.assert_called_with(ticket_path, "r", encoding=mock.ANY, errors=mock.ANY)
                             mock_plan_instance.run.assert_called_once_with(mock_content)
                             mock_write_text.assert_called_once_with(mock_plan)
 
@@ -2792,26 +2806,28 @@ class TestCommands(TestCase):
                     mock_plan_instance = mock_plan_coder_class.return_value
                     mock_plan_instance.run.return_value = case["response"]
 
-                    # Mock Path.write_text to avoid actual file writing
-                    with mock.patch("pathlib.Path.write_text") as mock_write_text:
-                        # Execute
-                        with mock.patch.object(io, "tool_error") as mock_tool_error:
-                            with mock.patch.object(io, "tool_output"):
-                                commands.cmd_plan_implementation(str(ticket_path))
+                    # Mock builtins.open for reading
+                    with mock.patch("builtins.open", mock.mock_open(read_data=self.PLAN_SAMPLE_TICKET_CONTENT)):
+                        # Mock Path.write_text to avoid actual file writing
+                        with mock.patch("pathlib.Path.write_text") as mock_write_text:
+                            # Execute
+                            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                                with mock.patch.object(io, "tool_output"):
+                                    commands.cmd_plan_implementation(str(ticket_path))
 
-                                # Verify
-                                if case["expected_error"]:
-                                    mock_tool_error.assert_called_once_with(mock.ANY)
-                                    self.assertIn(
-                                        case["expected_error"], mock_tool_error.call_args[0][0]
-                                    )
-                                else:
-                                    # Check that no error was reported
-                                    mock_tool_error.assert_not_called()
-                                    
-                                    # For non-error cases, verify write_text was called correctly
-                                    if case["response"] is not None:
-                                        mock_write_text.assert_called_once_with(case["response"])
+                                    # Verify
+                                    if case["expected_error"]:
+                                        mock_tool_error.assert_called_once_with(mock.ANY)
+                                        self.assertIn(
+                                            case["expected_error"], mock_tool_error.call_args[0][0]
+                                        )
+                                    else:
+                                        # Check that no error was reported
+                                        mock_tool_error.assert_not_called()
+                                        
+                                        # For non-error cases, verify write_text was called correctly
+                                        if case["response"] is not None:
+                                            mock_write_text.assert_called_once_with(case["response"])
 
     def test_cmd_plan_implementation_completion(self):
         """
