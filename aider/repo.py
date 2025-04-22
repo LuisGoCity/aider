@@ -490,10 +490,3 @@ class GitRepo:
             ).splitlines()
         except ANY_GIT_ERROR as e:
             raise e
-
-    def get_current_branch(self):
-        """Get the name of the current branch"""
-        try:
-            return self.repo.active_branch.name
-        except ANY_GIT_ERROR as e:
-            raise e
