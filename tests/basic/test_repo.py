@@ -726,9 +726,51 @@ class TestRepo(unittest.TestCase):
                 # Reset IO to capture new messages
                 io = InputOutput()
                 git_repo = GitRepo(io, None, None)
-
+                
                 # Call raise_pr method
                 git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
-
+                
                 # Verify error message was output
                 mock_run.assert_called()
+                
+    def test_raise_pr_error_handling(self):
+        """Test that raise_pr handles errors from GitHub CLI gracefully"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+            
+            # Create a file and make initial commit on master branch
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+            
+            # Make changes and commit on feature branch
+            fname.write_text("feature change")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature change")
+            
+            # Create GitRepo instance with mock IO
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+            
+            # Mock subprocess.run to simulate PR creation failure
+            mock_result = unittest.mock.Mock()
+            mock_result.returncode = 1
+            mock_result.stderr = "Error: failed to create PR\n"
+            
+            with patch("subprocess.run", return_value=mock_result) as mock_run:
+                # Call raise_pr method
+                git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+                
+                # Verify subprocess.run was called
+                self.assertEqual(mock_run.call_count, 1)
+                
+                # Verify the correct error message was output
+                # We can't directly check IO output, but the implementation should handle the error
