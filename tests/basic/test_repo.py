@@ -527,11 +527,14 @@ class TestRepo(unittest.TestCase):
             raw_repo.config_writer().set_value("user", "name", "Test User").release()
             raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
             
-            # Create a file and make initial commit on main branch
+            # Create a file and make initial commit on master branch (default for git init)
             fname = Path("test_file.txt")
             fname.write_text("initial content")
             raw_repo.git.add(str(fname))
             raw_repo.git.commit("-m", "Initial commit")
+            
+            # Create main branch since the default is master
+            raw_repo.git.branch("main")
             
             # Create and switch to feature branch
             raw_repo.git.branch("feature")
@@ -549,8 +552,8 @@ class TestRepo(unittest.TestCase):
             # Create GitRepo instance
             git_repo = GitRepo(InputOutput(), None, None)
             
-            # Get commit history between main and feature
-            commit_history = git_repo.get_commit_history("main", "feature")
+            # Get commit history between master and feature
+            commit_history = git_repo.get_commit_history("master", "feature")
             
             # Verify commit history contains our commit messages
             self.assertIn("Feature commit 1", commit_history)
