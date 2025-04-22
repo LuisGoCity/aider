@@ -25,7 +25,6 @@ class PlanCoder(Coder):
         initial_plan = self.generate_initial_plan(ticket_content)
 
         files_to_edit = self.identify_affected_files(initial_plan)
-
         final_plan = self.generate_final_plan(ticket_content, initial_plan, files_to_edit)
 
         self.io.tool_output(
@@ -113,7 +112,7 @@ class PlanCoder(Coder):
         step_files = {context_coder.get_rel_fname(fname) for fname in context_coder.abs_fnames}
         # Clear the context_coder's files for the next step
         context_coder.abs_fnames.clear()
-        return step_files
+        return list(step_files)
 
     def ask_context_coder(self, message):
         # Create a temporary instance of ContextCoder
