@@ -41,18 +41,47 @@ class PlanCoder(Coder):
     def generate_final_plan(self, ticket_content, initial_plan, affected_files):
         # Include file content for context
         file_contents = ""
-        for file in affected_files:
-            content = self.io.read_text(self.abs_root_path(file))
-            if content:
-                file_contents += f"\n\n{file}\n```\n{content}\n```"
+        
+        # Handle both dictionary and set/list formats of affected_files
+        if isinstance(affected_files, dict):
+            # Format the files by step
+            files_by_step = "\n".join(
+                f"Step {step}: {', '.join(files)}" 
+                for step, files in affected_files.items()
+            )
+            
+            # Get a flat list of all unique files
+            all_files = set()
+            for files_in_step in affected_files.values():
+                all_files.update(files_in_step)
+            
+            # Add content for each file
+            for file in all_files:
+                content = self.io.read_text(self.abs_root_path(file))
+                if content:
+                    file_contents += f"\n\n{file}\n```\n{content}\n```"
+                    
+            message = (
+                "Please create a detailed implementation plan for this JIRA"
+                f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\n"
+                f"The following files will need to be modified by step:\n{files_by_step}\n\n"
+                f"Here are the contents of these files for reference:{file_contents}\n\n"
+                "Please provide a comprehensive implementation plan with specific changes needed for each file."
+            )
+        else:
+            # Handle the case where affected_files is a set or list
+            for file in affected_files:
+                content = self.io.read_text(self.abs_root_path(file))
+                if content:
+                    file_contents += f"\n\n{file}\n```\n{content}\n```"
 
-        message = (
-            "Please create a detailed implementation plan for this JIRA"
-            f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\nThe following files"
-            f" will need to be modified:\n{', '.join(affected_files)}\n\nHere are the contents of"
-            f" these files for reference:{file_contents}\n\nPlease provide a comprehensive"
-            " implementation plan with specific changes needed for each file."
-        )
+            message = (
+                "Please create a detailed implementation plan for this JIRA"
+                f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\nThe following files"
+                f" will need to be modified:\n{', '.join(affected_files)}\n\nHere are the contents of"
+                f" these files for reference:{file_contents}\n\nPlease provide a comprehensive"
+                " implementation plan with specific changes needed for each file."
+            )
 
         self.run_one(message, preproc=False)
         return self.partial_response_content
