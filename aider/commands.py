@@ -341,6 +341,65 @@ class Commands:
         commit_message = args.strip() if args else None
         self.coder.repo.commit(message=commit_message)
 
+    def cmd_raise_pr(self, args=None):
+        "Create a pull request for the current branch with an AI-generated description"
+
+        if not self.coder.repo:
+            self.io.tool_error("No git repository found.")
+            return
+
+        self._clear_chat_history()
+        self._drop_all_files()
+
+        current_branch = self.coder.repo.repo.active_branch
+        default_branch = self.coder.repo.get_default_branch()
+        if not default_branch:
+            self.io.tool_error("Could not determine default branch (main or master).")
+            return
+
+        self.io.tool_output(
+            f"Creating PR from branch '{current_branch}' to '{default_branch}' based on changes..."
+        )
+        try:
+            commit_history = self.coder.repo.get_commit_history(default_branch, current_branch)
+            changed_files = self.coder.repo.get_changed_files(default_branch, current_branch)
+            self.cmd_add(" ".join(changed_files))
+        except ANY_GIT_ERROR as err:
+            self.io.tool_error(f"Unable to complete raise_pr: {err}")
+            return
+
+        # Instantiate context coder
+        from aider.coders.base_coder import Coder
+
+        context_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format="ask",
+            summarize_from_coder=False,
+        )
+
+        # Add prompt for description
+        description_prompt = (
+            "Based on the changes in this branch and the files added to chat, please generate a"
+            " detailed PR description (without a title) that explains:\n- What changes were made"
+            " \n- Why these changes were made \n- Any important implementation details \n- Any"
+            f" testing considerations.\nCommit history: \n{commit_history}\n Format your response"
+            " as a markdown description suitable for a pull request. Exclude any explanations"
+            " around commitsadd plan.md files or similar."
+        )
+
+        # Run description and store output in variable
+        pr_description = context_coder.run(description_prompt)
+
+        title_prompt = (
+            "Based on this PR description, generate a concise, descriptive title (one line):\n"
+            f"{pr_description}\n Return only the title text, nothing else."
+        )
+
+        pr_title = context_coder.run(title_prompt).strip()
+
+        self.coder.repo.raise_pr(default_branch, current_branch, pr_title, pr_description)
+
     def cmd_lint(self, args="", fnames=None):
         "Lint and fix in-chat files or all dirty files if none in chat"
 

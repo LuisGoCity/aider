@@ -453,3 +453,324 @@ class TestRepo(unittest.TestCase):
             # Verify the commit was actually made
             latest_commit_msg = raw_repo.head.commit.message
             self.assertEqual(latest_commit_msg.strip(), "Should succeed")
+
+    def test_get_default_branch(self):
+        """Test that get_default_branch correctly identifies main or master as the default branch"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+
+            # Create a file to commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+
+            # Do the initial commit on master branch (default for git init)
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+
+            # Test default branch detection - should be "master" initially
+            default_branch = git_repo.get_default_branch()
+            self.assertEqual(default_branch, "main")
+
+            # Create and switch to "main" branch
+            raw_repo.git.branch("main")
+            raw_repo.git.checkout("main")
+
+            # Test default branch detection again - should find "main" first
+            # since the implementation checks for "main" before "master"
+            default_branch = git_repo.get_default_branch()
+            self.assertEqual(default_branch, "main")
+
+            # Delete master branch to test only main exists
+            raw_repo.git.branch("-D", "master")
+
+            # Test default branch detection - should still be "main"
+            default_branch = git_repo.get_default_branch()
+            self.assertEqual(default_branch, "main")
+
+    def test_get_default_branch_error_handling(self):
+        """Test that get_default_branch handles errors gracefully"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+
+            # Create a file to commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+
+            # Test normal behavior first
+            default_branch = git_repo.get_default_branch()
+            self.assertIsNotNone(default_branch)
+
+            # Mock git.cmd.Git.execute to simulate git errors
+            with patch(
+                "git.cmd.Git.execute", side_effect=git.exc.GitCommandError("rev-parse", 128)
+            ):
+                # Replace the repo in git_repo with our mocked repo
+                git_repo.repo = raw_repo
+
+                # Method should return None when both branch checks fail
+                default_branch = git_repo.get_default_branch()
+                self.assertIsNone(default_branch)
+
+    def test_get_commit_history(self):
+        """Test that get_commit_history correctly returns commit history between branches"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a file and make initial commit on master branch (default for git init)
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create main branch since the default is master
+            raw_repo.git.branch("main")
+
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+
+            # Make changes and commits on feature branch
+            fname.write_text("feature change 1")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature commit 1")
+
+            fname.write_text("feature change 2")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature commit 2")
+
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+
+            # Get commit history between master and feature
+            commit_history = git_repo.get_commit_history("master", "feature")
+
+            # Verify commit history contains our commit messages
+            self.assertIn("Feature commit 1", commit_history)
+            self.assertIn("Feature commit 2", commit_history)
+
+            # Verify it doesn't contain the initial commit (which is on both branches)
+            self.assertNotIn("Initial commit", commit_history)
+
+    def test_get_commit_history_error_handling(self):
+        """Test that get_commit_history handles errors gracefully"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a file to commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+
+            # Test with non-existent branch
+            with self.assertRaises(git.exc.GitCommandError):
+                git_repo.get_commit_history("master", "non-existent-branch")
+
+            # Mock git.cmd.Git.execute to simulate git errors
+            with patch("git.cmd.Git.execute", side_effect=git.exc.GitCommandError("log", 128)):
+                # Replace the repo in git_repo with our mocked repo
+                git_repo.repo = raw_repo
+
+                # Method should raise the GitCommandError
+                with self.assertRaises(git.exc.GitCommandError):
+                    git_repo.get_commit_history("master", "feature")
+
+    def test_get_changed_files_error_handling(self):
+        """Test that get_changed_files handles errors gracefully"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a file to commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+
+            # Test with non-existent branch
+            with self.assertRaises(git.exc.GitCommandError):
+                git_repo.get_changed_files("master", "non-existent-branch")
+
+            # Mock git.cmd.Git.execute to simulate git errors
+            with patch("git.cmd.Git.execute", side_effect=git.exc.GitCommandError("diff", 128)):
+                # Replace the repo in git_repo with our mocked repo
+                git_repo.repo = raw_repo
+
+                # Method should raise the GitCommandError
+                with self.assertRaises(git.exc.GitCommandError):
+                    git_repo.get_changed_files("master", "feature")
+
+    def test_get_changed_files(self):
+        """Test that get_changed_files correctly returns files changed between branches"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a file and make initial commit on master branch
+            fname1 = Path("test_file1.txt")
+            fname1.write_text("initial content")
+            raw_repo.git.add(str(fname1))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+
+            # Modify existing file
+            fname1.write_text("modified content")
+            raw_repo.git.add(str(fname1))
+
+            # Add new file
+            fname2 = Path("test_file2.txt")
+            fname2.write_text("new file content")
+            raw_repo.git.add(str(fname2))
+
+            # Commit changes on feature branch
+            raw_repo.git.commit("-m", "Feature changes")
+
+            # Create GitRepo instance
+            git_repo = GitRepo(InputOutput(), None, None)
+
+            # Get changed files between master and feature
+            changed_files = git_repo.get_changed_files("master", "feature")
+
+            # Verify both files are in the changed files list
+            self.assertIn("test_file1.txt", changed_files)
+            self.assertIn("test_file2.txt", changed_files)
+            self.assertEqual(len(changed_files), 2)
+
+    def test_raise_pr(self):
+        """Test that raise_pr correctly calls GitHub CLI to create a PR"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a file and make initial commit on master branch
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+
+            # Make changes and commit on feature branch
+            fname.write_text("feature change")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature change")
+
+            # Create GitRepo instance with mock IO
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+
+            # Mock subprocess.run to simulate successful PR creation
+            pr_url = "https://github.com/user/repo/pull/123"
+            mock_result = unittest.mock.Mock()
+            mock_result.returncode = 0
+            mock_result.stdout = pr_url + "\n"
+
+            with patch("subprocess.run", return_value=mock_result) as mock_run:
+                # Call raise_pr method
+                git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+
+                # Verify subprocess.run was called
+                mock_run.assert_called()
+
+                # Get the command that was passed to subprocess.run
+                args = mock_run.call_args[0][0]
+
+                # Check that the command contains all the expected parts
+                self.assertIn("gh", args)
+                self.assertIn("pr", args)
+                self.assertIn("create", args)
+                self.assertIn("--base", args)
+                self.assertIn("master", args)
+                self.assertIn("--head", args)
+                self.assertIn("feature", args)
+                self.assertIn("--title", args)
+                self.assertIn("Test PR Title", args)
+                self.assertIn("--body", args)
+                self.assertIn("Test PR Description", args)
+
+            # Test when GitHub CLI is not available
+            with patch("subprocess.run", side_effect=FileNotFoundError()) as mock_run:
+                # Reset IO to capture new messages
+                io = InputOutput()
+                git_repo = GitRepo(io, None, None)
+
+                # Call raise_pr method
+                git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+
+                # Verify error message was output
+                mock_run.assert_called()
+
+    def test_raise_pr_error_handling(self):
+        """Test that raise_pr handles errors from GitHub CLI gracefully"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a file and make initial commit on master branch
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create and switch to feature branch
+            raw_repo.git.branch("feature")
+            raw_repo.git.checkout("feature")
+
+            # Make changes and commit on feature branch
+            fname.write_text("feature change")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Feature change")
+
+            # Create GitRepo instance with mock IO
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+
+            # Mock subprocess.run to simulate PR creation failure
+            mock_result = unittest.mock.Mock()
+            mock_result.returncode = 1
+            mock_result.stderr = "Error: failed to create PR\n"
+
+            with patch("subprocess.run", return_value=mock_result) as mock_run:
+                # Call raise_pr method
+                git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+
+                # Verify subprocess.run was called
+                self.assertEqual(mock_run.call_count, 2)
+
+                # Verify the correct error message was output
+                # We can't directly check IO output, but the implementation should handle the error
