@@ -1855,6 +1855,29 @@ Just show me the edits I need to make.
             )
         except Exception as e:
             self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {str(e)}")
+            
+    def cmd_clean_code(self, args):
+        """Clean up code in files modified in the current git branch with specified intensity level
+        
+        This command identifies files that have been modified in the current git branch compared to
+        the default branch, and performs code cleanup operations on them. The cleanup focuses on
+        reducing code bloat, removing unused code, improving verbosity, and adding missing docstrings.
+        
+        Args:
+            args: String containing the intensity level (low, medium, high) for cleanup operations
+        """
+        # Check if git repository exists
+        if not self.coder.repo:
+            self.io.tool_error("No git repository found.")
+            return
+            
+        # Parse intensity level from args
+        intensity = args.strip().lower() if args.strip() else "medium"
+        if intensity not in ["low", "medium", "high"]:
+            self.io.tool_warning(f"Invalid intensity level: {intensity}. Using 'medium' instead.")
+            intensity = "medium"
+            
+        self.io.tool_output(f"Starting code cleanup with {intensity} intensity...")
 
 
 def expand_subdir(file_path):
