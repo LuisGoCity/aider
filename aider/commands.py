@@ -1878,6 +1878,47 @@ Just show me the edits I need to make.
             intensity = "medium"
             
         self.io.tool_output(f"Starting code cleanup with {intensity} intensity...")
+        
+        # Get the default branch name
+        try:
+            default_branch = self.coder.repo.get_default_branch()
+            if not default_branch:
+                self.io.tool_error("Could not determine default branch.")
+                return
+        except ANY_GIT_ERROR as e:
+            self.io.tool_error(f"Error determining default branch: {str(e)}")
+            return
+            
+        # Get files modified in current branch compared to default branch
+        try:
+            modified_files = self.coder.repo.get_changed_files(default_branch)
+            if not modified_files:
+                self.io.tool_output("No modified files found in the current branch.")
+                return
+        except ANY_GIT_ERROR as e:
+            self.io.tool_error(f"Error identifying modified files: {str(e)}")
+            return
+            
+        # Filter for code files based on extensions
+        code_extensions = [
+            '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp',
+            '.cs', '.go', '.rb', '.php', '.swift', '.kt', '.rs', '.scala', '.sh',
+            '.html', '.css', '.scss', '.sass', '.less'
+        ]
+        
+        code_files = [
+            f for f in modified_files 
+            if os.path.splitext(f)[1].lower() in code_extensions
+            and os.path.exists(os.path.join(self.coder.root, f))
+        ]
+        
+        if not code_files:
+            self.io.tool_output("No code files found among the modified files.")
+            return
+            
+        self.io.tool_output(f"Found {len(code_files)} modified code files to clean:")
+        for file in code_files:
+            self.io.tool_output(f"  - {file}")
 
 
 def expand_subdir(file_path):
