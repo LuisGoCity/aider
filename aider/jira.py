@@ -7,15 +7,16 @@ from requests.auth import HTTPBasicAuth
 
 
 class Jira:
-    def __init__(self):
-        self.base_url = os.environ.get("JIRA_SERVER_URL")
-        self.email = os.environ.get("JIRA_EMAIL")
-        self.api_token = os.environ.get("JIRA_API_TOKEN")
+    def __init__(self, jira_server_url=None, jira_email=None, jira_api_token=None):
+        # First try parameters, then environment variables
+        self.base_url = jira_server_url or os.environ.get("JIRA_SERVER_URL")
+        self.email = jira_email or os.environ.get("JIRA_EMAIL")
+        self.api_token = jira_api_token or os.environ.get("JIRA_API_TOKEN")
 
         if not all([self.base_url, self.email, self.api_token]):
             raise ValueError(
-                "One of the following env variables required for JIRA has not been roperly set: "
-                "JIRA_SERVER_URL, JIRA_EMAIL, JIRA_API_TOKEN"
+                "Jira configuration is incomplete. Please provide the following either as"
+                " parameters or environment variables: JIRA_SERVER_URL, JIRA_EMAIL, JIRA_API_TOKEN"
             )
 
         self.auth = HTTPBasicAuth(self.email, self.api_token)
