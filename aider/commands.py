@@ -1812,6 +1812,36 @@ class Commands:
         if switch_coder:
             self._from_plan_exist_strategy(original_confirm_ask)
 
+    def _get_language_from_extension(self, extension):
+        """Helper method to get language name from file extension"""
+        extension_map = {
+            '.py': 'Python',
+            '.js': 'JavaScript',
+            '.jsx': 'JavaScript React',
+            '.ts': 'TypeScript',
+            '.tsx': 'TypeScript React',
+            '.java': 'Java',
+            '.c': 'C',
+            '.cpp': 'C++',
+            '.h': 'C/C++ Header',
+            '.hpp': 'C++ Header',
+            '.cs': 'C#',
+            '.go': 'Go',
+            '.rb': 'Ruby',
+            '.php': 'PHP',
+            '.swift': 'Swift',
+            '.kt': 'Kotlin',
+            '.rs': 'Rust',
+            '.scala': 'Scala',
+            '.sh': 'Shell',
+            '.html': 'HTML',
+            '.css': 'CSS',
+            '.scss': 'SCSS',
+            '.sass': 'Sass',
+            '.less': 'Less'
+        }
+        return extension_map.get(extension, 'code')
+        
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
 
@@ -1953,6 +1983,80 @@ Just show me the edits I need to make.
         self.io.tool_output("Cleanup operations to perform:")
         for i, prompt in enumerate(selected_prompts, 1):
             self.io.tool_output(f"  {i}. {prompt}")
+            
+        # Process each file
+        processed_files = []
+        modified_files = []
+        
+        self.io.tool_output("\nProcessing files...")
+        for file_path in code_files:
+            abs_path = os.path.join(self.coder.root, file_path)
+            
+            # Check if file exists and can be read
+            if not os.path.exists(abs_path):
+                self.io.tool_warning(f"File {file_path} no longer exists, skipping.")
+                continue
+                
+            try:
+                with open(abs_path, 'r', encoding='utf-8') as f:
+                    original_content = f.read()
+            except Exception as e:
+                self.io.tool_warning(f"Could not read {file_path}: {str(e)}, skipping.")
+                continue
+                
+            self.io.tool_output(f"\nCleaning {file_path}...")
+            
+            # Create a temporary coder instance for this file
+            try:
+                # Create a prompt for the file cleanup
+                file_extension = os.path.splitext(file_path)[1].lower()
+                language = self._get_language_from_extension(file_extension)
+                
+                cleanup_prompt = f"I need you to clean up the following {language} code file. "
+                cleanup_prompt += "Focus on these specific tasks:\n"
+                for task in selected_prompts:
+                    cleanup_prompt += f"- {task}\n"
+                cleanup_prompt += "\nMake sure to preserve the functionality of the code while improving its quality."
+                
+                # Add the file to the coder's context
+                self.coder.add_rel_fname(file_path)
+                
+                # Process the file with each cleanup prompt
+                was_modified = False
+                
+                # Send the cleanup request to the LLM
+                response = self.coder.run(cleanup_prompt)
+                
+                # Check if file was modified
+                try:
+                    with open(abs_path, 'r', encoding='utf-8') as f:
+                        new_content = f.read()
+                    
+                    if new_content != original_content:
+                        was_modified = True
+                        modified_files.append(file_path)
+                        self.io.tool_output(f"✓ {file_path} was cleaned successfully.")
+                    else:
+                        self.io.tool_output(f"- No changes needed for {file_path}.")
+                except Exception as e:
+                    self.io.tool_warning(f"Error checking modifications for {file_path}: {str(e)}")
+                
+                processed_files.append(file_path)
+                
+            except Exception as e:
+                self.io.tool_error(f"Error processing {file_path}: {str(e)}")
+                continue
+            
+            # Remove the file from the coder's context after processing
+            if file_path in self.coder.get_inchat_relative_files():
+                self.coder.abs_fnames.remove(abs_path)
+        
+        # Summary
+        if not processed_files:
+            self.io.tool_output("\nNo files were processed.")
+            return
+            
+        self.io.tool_output(f"\nSummary: Processed {len(processed_files)} files, modified {len(modified_files)} files.")
 
 
 def expand_subdir(file_path):
