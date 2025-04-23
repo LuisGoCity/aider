@@ -40,12 +40,15 @@ class Jira:
 
     def get_issue(self, issue_key_or_id):
         try:
+            print(self.v2_endpoint + "/issue" + f"/{issue_key_or_id}")
             response = requests.request(
-                method="GET", url=self.v2_endpoint + "/issue" + f"/{issue_key_or_id}"
+                method="GET",
+                url=self.v2_endpoint + "/issue" + f"/{issue_key_or_id}",
+                headers=self.json_header,
+                auth=self.auth,
             )
         except Exception as e:
             raise Exception(f"Could not retrieve issue {issue_key_or_id}:\n{e}")
-
         if response.status_code != 200:
             raise Exception(
                 f"Request for issue {issue_key_or_id} raised error: {response.status_code}"
