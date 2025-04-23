@@ -1919,6 +1919,40 @@ Just show me the edits I need to make.
         self.io.tool_output(f"Found {len(code_files)} modified code files to clean:")
         for file in code_files:
             self.io.tool_output(f"  - {file}")
+            
+        # Define cleanup prompts by intensity level
+        cleanup_prompts = {
+            "low": [
+                "Remove unused imports and variables from the code.",
+                "Add missing docstrings to functions, methods, and classes that don't have them.",
+                "Fix obvious syntax issues and ensure consistent indentation."
+            ],
+            "medium": [
+                "Remove unused imports, variables, functions, and methods.",
+                "Add comprehensive docstrings to all functions, methods, and classes.",
+                "Make the code less verbose by removing redundant comments and simplifying expressions.",
+                "Ensure consistent coding style throughout the file.",
+                "Fix any potential bugs or edge cases in the code."
+            ],
+            "high": [
+                "Perform thorough refactoring to improve maintainability while preserving functionality.",
+                "Remove all unused code, including imports, variables, functions, and methods.",
+                "Add detailed docstrings with type hints to all functions, methods, and classes.",
+                "Optimize code structure and apply design patterns where appropriate.",
+                "Simplify complex logic and break down large functions into smaller, more focused ones.",
+                "Ensure consistent naming conventions and coding style throughout the file.",
+                "Add appropriate error handling where it's missing.",
+                "Apply best practices specific to the programming language being used."
+            ]
+        }
+        
+        # Select prompts based on intensity level
+        selected_prompts = cleanup_prompts.get(intensity, cleanup_prompts["medium"])
+        
+        self.io.tool_output(f"\nSelected cleanup intensity: {intensity}")
+        self.io.tool_output("Cleanup operations to perform:")
+        for i, prompt in enumerate(selected_prompts, 1):
+            self.io.tool_output(f"  {i}. {prompt}")
 
 
 def expand_subdir(file_path):
