@@ -2057,6 +2057,23 @@ Just show me the edits I need to make.
             return
             
         self.io.tool_output(f"\nSummary: Processed {len(processed_files)} files, modified {len(modified_files)} files.")
+        
+        # Auto-commit changes if enabled and files were modified
+        if modified_files and hasattr(self.coder, "auto_commits") and self.coder.auto_commits:
+            try:
+                commit_message = f"refactor: Clean code with {intensity} intensity"
+                if len(modified_files) == 1:
+                    commit_message += f" in {modified_files[0]}"
+                else:
+                    commit_message += f" in {len(modified_files)} files"
+                
+                self.io.tool_output("\nCommitting changes...")
+                self.coder.repo.commit(commit_message, modified_files)
+                self.io.tool_output(f"✓ Changes committed with message: '{commit_message}'")
+            except ANY_GIT_ERROR as e:
+                self.io.tool_error(f"Failed to commit changes: {str(e)}")
+            except Exception as e:
+                self.io.tool_error(f"Unexpected error during commit: {str(e)}")
 
 
 def expand_subdir(file_path):
