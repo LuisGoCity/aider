@@ -815,6 +815,10 @@ class InputOutput:
         if "Run shell command?" in question:
             return False
 
+        # Auto-say yes to creating files to context
+        if "Create new file?" in question:
+            return True
+
         # For everything else, use the original confirm_ask method
         self.num_user_asks += 1
 

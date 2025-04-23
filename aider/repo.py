@@ -492,6 +492,11 @@ class GitRepo:
         except ANY_GIT_ERROR as e:
             raise e
 
+    def push_commited_changes(self):
+        cmd = ["git", "push", "-u", "origin"]
+
+        subprocess.run(cmd, capture_output=True, text=True)
+
     def raise_pr(self, base_branch, compare_branch, pr_title, pr_description):
         """Raise a PR via the git cli."""
         # Check if GitHub CLI is available
@@ -503,6 +508,7 @@ class GitRepo:
             pass
 
         if gh_available:
+            self.push_commited_changes()
             cmd = [
                 "gh",
                 "pr",
