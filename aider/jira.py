@@ -46,7 +46,9 @@ class Jira:
             raise Exception(f"Could not retrieve issue {issue_key_or_id}:\n{e}")
 
         if response.status_code != 200:
-            return
+            raise Exception(
+                f"Request for issue {issue_key_or_id} raised error: {response.status_code}"
+            )
 
         return json.loads(response.text)
 
