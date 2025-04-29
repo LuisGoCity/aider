@@ -1,4 +1,5 @@
 import glob
+import json
 import os
 import re
 import subprocess
@@ -1651,6 +1652,53 @@ class Commands:
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
 
+    def cmd_solve_jira(self, args):
+        "Implement feature from jira issue key or id. Optionally raise a pr"
+
+        args = args.strip()
+        if not args:
+            self.io.tool_error("Please provide a JIRA issue key or ID")
+            return
+
+        # Parse arguments - look for --with-pr or -pr flag
+        parts = args.split()
+        with_pr = False
+        issue_key_or_id = None
+
+        for i, part in enumerate(parts):
+            if part.lower() in ("--with-pr", "-pr"):
+                with_pr = True
+                # Remove the flag from parts
+                parts.pop(i)
+                break
+
+        # The remaining parts should be the issue key/ID
+        if parts:
+            issue_key_or_id = " ".join(parts)
+
+        if not issue_key_or_id:
+            self.io.tool_error("Please provide a JIRA issue key or ID")
+            return
+
+        from .jira import Jira
+
+        jira = Jira()
+        jira_ticket = jira.get_issue_content(issue_key_or_id)
+        path_to_ticket = f"jira_issue_{issue_key_or_id}.txt"
+        self.io.write_text(
+            filename=path_to_ticket, content=json.dumps(jira_ticket, ensure_ascii=False)
+        )
+        self.cmd_plan_implementation(path_to_ticket)
+        implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
+
+        self._clear_chat_history()
+        self._drop_all_files()
+
+        self.cmd_code_from_plan(implementation_plan, switch_coder=False)
+
+        if with_pr:
+            self.cmd_raise_pr()
+
     def cmd_plan_implementation(self, args):
         "Generate an implementation plan from a JIRA ticket or feature specification file"
         if not args.strip():
@@ -1688,7 +1736,7 @@ class Commands:
         impementation_plan = plan_coder.run(ticket_content)
 
         # Save the plan to a markdown file
-        output_path = os.path.splitext(ticket_path)[0] + "implementation_plan.md"
+        output_path = os.path.splitext(ticket_path)[0] + "_implementation_plan.md"
         try:
             with open(output_path, "w", encoding=self.io.encoding) as f:
                 f.write(impementation_plan)
@@ -1697,7 +1745,7 @@ class Commands:
         except Exception as e:
             self.io.tool_error(f"Error saving implementation plan: {e}")
 
-    def cmd_code_from_plan(self, args):
+    def cmd_code_from_plan(self, args, switch_coder=True):
         "Execute a coding plan from a Markdown file step by step"
         if not args.strip():
             self.io.tool_error("Please provide a path to a Markdown plan file")
@@ -1760,7 +1808,9 @@ class Commands:
                 self.io.tool_output(f"Implementing step {j}")
                 prompt = get_step_prompt(i, plan_path)
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
-        self._from_plan_exist_strategy(original_confirm_ask)
+
+        if switch_coder:
+            self._from_plan_exist_strategy(original_confirm_ask)
 
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
