@@ -1812,6 +1812,36 @@ class Commands:
         if switch_coder:
             self._from_plan_exist_strategy(original_confirm_ask)
 
+    def _get_language_from_extension(self, extension):
+        """Helper method to get language name from file extension"""
+        extension_map = {
+            ".py": "Python",
+            ".js": "JavaScript",
+            ".jsx": "JavaScript React",
+            ".ts": "TypeScript",
+            ".tsx": "TypeScript React",
+            ".java": "Java",
+            ".c": "C",
+            ".cpp": "C++",
+            ".h": "C/C++ Header",
+            ".hpp": "C++ Header",
+            ".cs": "C#",
+            ".go": "Go",
+            ".rb": "Ruby",
+            ".php": "PHP",
+            ".swift": "Swift",
+            ".kt": "Kotlin",
+            ".rs": "Rust",
+            ".scala": "Scala",
+            ".sh": "Shell",
+            ".html": "HTML",
+            ".css": "CSS",
+            ".scss": "SCSS",
+            ".sass": "Sass",
+            ".less": "Less",
+        }
+        return extension_map.get(extension, "code")
+
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
 
@@ -1855,6 +1885,146 @@ Just show me the edits I need to make.
             )
         except Exception as e:
             self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {str(e)}")
+
+    def cmd_clean_code(self, args):
+        "Clean up code in files modified in the current git branch with specified intensity level"
+        # Check if git repository exists
+        if not self.coder.repo:
+            self.io.tool_error("No git repository found.")
+            return
+
+        # Parse intensity level from args
+        intensity = args.strip().lower() if args.strip() else "medium"
+        if intensity not in ["low", "medium", "high"]:
+            self.io.tool_warning(f"Invalid intensity level: {intensity}. Using 'medium' instead.")
+            intensity = "medium"
+
+        self.io.tool_output(f"Starting code cleanup with {intensity} intensity...")
+
+        default_branch = self.coder.repo.get_default_branch()
+        if not default_branch:
+            self.io.tool_error("Could not determine default branch.")
+            return
+
+        modified_files = self.coder.repo.get_changed_files(default_branch)
+        if not modified_files:
+            self.io.tool_output("No modified files found in the current branch.")
+            return
+
+        # Filter for code files based on extensions
+        code_extensions = [
+            ".py",
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".java",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".cs",
+            ".go",
+            ".rb",
+            ".php",
+            ".swift",
+            ".kt",
+            ".rs",
+            ".scala",
+            ".sh",
+            ".html",
+            ".css",
+            ".scss",
+            ".sass",
+            ".less",
+        ]
+
+        code_files = [
+            f
+            for f in modified_files
+            if os.path.splitext(f)[1].lower() in code_extensions
+            and os.path.exists(os.path.join(self.coder.root, f))
+        ]
+
+        if not code_files:
+            self.io.tool_output("No code files found among the modified files.")
+            return
+
+        self.io.tool_output(f"Found {len(code_files)} modified code files to clean")
+
+        # Define cleanup prompts by intensity level
+        cleanup_prompts = {
+            "low": [
+                "Add missing docstrings to functions, methods, and classes that don't have them.",
+                "Fix obvious syntax issues and ensure consistent indentation.",
+            ],
+            "medium": [
+                (
+                    "Make the code less verbose by removing redundant comments and simplifying"
+                    " expressions."
+                ),
+                "Ensure consistent coding style throughout the file.",
+                "Fix any potential bugs or edge cases in the code.",
+            ],
+            "high": [
+                (
+                    "Perform thorough refactoring to improve maintainability while preserving"
+                    " functionality."
+                ),
+                "Remove all unused code, including imports, variables, functions, and methods.",
+                "Optimize code structure and apply design patterns where appropriate.",
+                (
+                    "Simplify complex logic and break down large functions into smaller, more"
+                    " focused ones."
+                ),
+                "Ensure consistent naming conventions and coding style throughout the file.",
+                "Add appropriate error handling where it's missing.",
+                "Apply best practices specific to the programming language being used.",
+            ],
+        }
+
+        # Select prompts based on intensity level
+        selected_prompts = cleanup_prompts.get(intensity, cleanup_prompts["medium"])
+
+        self.io.tool_output(f"\nSelected cleanup intensity: {intensity}")
+        self.io.tool_output("Cleanup operations to perform:")
+        for i, prompt in enumerate(selected_prompts, 1):
+            self.io.tool_output(f"  {i}. {prompt}")
+        original_confirm_ask = self.io.confirm_ask
+        self.io.confirm_ask = self.io.auto_confirm_ask
+        for file_path in code_files:
+            abs_path = os.path.join(self.coder.root, file_path)
+
+            # Check if file exists and can be read
+            if not os.path.exists(abs_path):
+                self.io.tool_warning(f"File {file_path} no longer exists, skipping.")
+                continue
+
+            self.io.tool_output(f"\nCleaning {file_path}...")
+
+            # Create a temporary coder instance for this file
+            try:
+                # Create a prompt for the file cleanup
+                file_extension = os.path.splitext(file_path)[1].lower()
+                language = self._get_language_from_extension(file_extension)
+
+                cleanup_prompt = f"I need you to clean up the following {language} code file. "
+                cleanup_prompt += "Focus on these specific tasks:\n"
+                for task in selected_prompts:
+                    cleanup_prompt += f"- {task}\n"
+                cleanup_prompt += (
+                    "\nMake sure to preserve the functionality of the code while improving its"
+                    " quality."
+                )
+                self.cmd_add(file_path)
+                self._run_new_coder(
+                    prompt=cleanup_prompt, summarize_from_coder=True, exclude_from_drop=True
+                )
+            except Exception as e:
+                self.io.tool_error(f"Error processing {file_path}: {str(e)}")
+                continue
+
+        self.io.confirm_ask = original_confirm_ask
 
 
 def expand_subdir(file_path):
