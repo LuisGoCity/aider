@@ -492,10 +492,61 @@ class GitRepo:
         except ANY_GIT_ERROR as e:
             raise e
 
-    def push_commited_changes(self):
-        cmd = ["git", "push", "-u", "origin"]
+    def push_commited_changes(self, branch_name=None):
+        """
+        Push committed changes to the remote repository.
 
-        subprocess.run(cmd, capture_output=True, text=True)
+        Args:
+            branch_name (str, optional): The name of the branch to push. If None,
+                                        attempts to detect the current branch.
+
+        Returns:
+            tuple: (success, error_message) where success is a boolean indicating if
+                  the push was successful, and error_message is a string with details
+                  if the push failed (None if successful).
+        """
+        if not branch_name:
+            branch_name = self.repo.active_branch.name
+
+        if branch_name:
+            cmd = ["git", "push", "origin", "-u", branch_name]
+        else:
+            # Fallback to original behavior if branch name cannot be determined
+            cmd = ["git", "push", "-u", "origin"]
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+            if result.returncode != 0:
+                error_msg = result.stderr.strip()
+                if "Authentication failed" in error_msg:
+                    self.io.tool_error("Git authentication failed. Please check your credentials.")
+                    return False, "Git authentication failed. Please check your credentials."
+                elif "could not read Username" in error_msg:
+                    self.io.tool_error(
+                        "Git credentials not found. Please configure your git credentials."
+                    )
+                    return (
+                        False,
+                        "Git credentials not found. Please configure your git credentials.",
+                    )
+                elif "Connection timed out" in error_msg or "Could not resolve host" in error_msg:
+                    self.io.tool_error(
+                        "Network error while pushing to remote. Please check your connection."
+                    )
+                    return (
+                        False,
+                        "Network error while pushing to remote. Please check your connection.",
+                    )
+                else:
+                    self.io.tool_error(f"Git push failed: {error_msg}")
+                    return False, f"Git push failed: {error_msg}"
+
+            return True, None
+
+        except subprocess.SubprocessError as e:
+            self.io.tool_error(f"Error executing git push command: {str(e)}")
+            return False, f"Error executing git push command: {str(e)}"
 
     def raise_pr(self, base_branch, compare_branch, pr_title, pr_description):
         """Raise a PR via the git cli."""
@@ -508,7 +559,11 @@ class GitRepo:
             pass
 
         if gh_available:
-            self.push_commited_changes()
+            # Push changes to remote with the specific branch name
+            success, error_message = self.push_commited_changes(branch_name=compare_branch.name)
+            if not success:
+                self.io.tool_error(f"Failed to push changes before creating PR: {error_message}")
+                return False
             cmd = [
                 "gh",
                 "pr",
@@ -528,8 +583,11 @@ class GitRepo:
             if result.returncode == 0:
                 pr_url = result.stdout.strip()
                 self.io.tool_output(f"PR created successfully: {pr_url}")
+                return True
             else:
                 self.io.tool_error(f"Failed to create PR: {result.stderr}")
+                return False
         else:
             self.io.tool_error("GitHub CLI (gh) not found. Please install it to create PRs.")
             self.io.tool_output("You can create the PR manually using this description.")
+            return False
