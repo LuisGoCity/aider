@@ -1652,6 +1652,55 @@ class Commands:
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
 
+    def _commit_file(self, filepath, commit_message):
+        """Helper method to commit a file to git repository
+        
+        Args:
+            filepath: Path to the file to commit
+            commit_message: Commit message
+            
+        Returns:
+            bool: True if commit was successful, False otherwise
+        """
+        if not self.coder.repo:
+            return False
+            
+        try:
+            self.coder.repo.repo.git.add(filepath)
+            self.coder.repo.commit(message=commit_message)
+            self.io.tool_output(f"Committed: {filepath}")
+            return True
+        except ANY_GIT_ERROR as err:
+            self.io.tool_error(f"Unable to commit file {filepath}: {err}")
+            return False
+    
+    def _delete_and_commit_file(self, filepath, commit_message):
+        """Helper method to delete a file and commit the deletion
+        
+        Args:
+            filepath: Path to the file to delete
+            commit_message: Commit message for the deletion
+            
+        Returns:
+            bool: True if deletion and commit were successful, False otherwise
+        """
+        if not os.path.exists(filepath):
+            self.io.tool_warning(f"File does not exist: {filepath}")
+            return False
+            
+        if not self.coder.repo:
+            return False
+            
+        try:
+            os.remove(filepath)
+            self.coder.repo.repo.git.add(filepath)
+            self.coder.repo.commit(message=commit_message)
+            self.io.tool_output(f"Removed and committed deletion of: {filepath}")
+            return True
+        except ANY_GIT_ERROR as err:
+            self.io.tool_error(f"Unable to remove and commit file {filepath}: {err}")
+            return False
+    
     def cmd_solve_jira(self, args):
         "Implement feature from jira issue key or id. Optionally raise a pr"
 
@@ -1692,16 +1741,10 @@ class Commands:
         implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
         
         # Commit the implementation plan file first
-        if self.coder.repo:
-            try:
-                # Add the implementation plan to git
-                self.coder.repo.repo.git.add(implementation_plan)
-                # Commit the implementation plan with a descriptive message
-                commit_message = f"Add implementation plan for {issue_key_or_id}"
-                self.coder.repo.commit(message=commit_message)
-                self.io.tool_output(f"Committed implementation plan: {implementation_plan}")
-            except ANY_GIT_ERROR as err:
-                self.io.tool_error(f"Unable to commit implementation plan: {err}")
+        self._commit_file(
+            implementation_plan, 
+            f"Add implementation plan for {issue_key_or_id}"
+        )
 
         self._clear_chat_history()
         self._drop_all_files()
@@ -1709,28 +1752,15 @@ class Commands:
         self.cmd_code_from_plan(implementation_plan, switch_coder=False)
 
         # Clean up files before raising PR
-        if self.coder.repo:
-            # Delete and commit the implementation plan file
-            if os.path.exists(implementation_plan):
-                try:
-                    os.remove(implementation_plan)
-                    self.coder.repo.repo.git.add(implementation_plan)
-                    commit_message = f"Remove implementation plan file for {issue_key_or_id}"
-                    self.coder.repo.commit(message=commit_message)
-                    self.io.tool_output(f"Removed and committed deletion of: {implementation_plan}")
-                except ANY_GIT_ERROR as err:
-                    self.io.tool_error(f"Unable to remove implementation plan file: {err}")
-            
-            # Delete and commit the JIRA ticket file
-            if os.path.exists(path_to_ticket):
-                try:
-                    os.remove(path_to_ticket)
-                    self.coder.repo.repo.git.add(path_to_ticket)
-                    commit_message = f"Remove JIRA ticket file for {issue_key_or_id}"
-                    self.coder.repo.commit(message=commit_message)
-                    self.io.tool_output(f"Removed and committed deletion of: {path_to_ticket}")
-                except ANY_GIT_ERROR as err:
-                    self.io.tool_error(f"Unable to remove JIRA ticket file: {err}")
+        self._delete_and_commit_file(
+            implementation_plan,
+            f"Remove implementation plan file for {issue_key_or_id}"
+        )
+        
+        self._delete_and_commit_file(
+            path_to_ticket,
+            f"Remove JIRA ticket file for {issue_key_or_id}"
+        )
 
         if with_pr:
             self.cmd_raise_pr()
