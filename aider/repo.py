@@ -492,8 +492,11 @@ class GitRepo:
         except ANY_GIT_ERROR as e:
             raise e
 
-    def push_commited_changes(self):
-        cmd = ["git", "push", "-u", "origin"]
+    def push_commited_changes(self, branch_name=None):
+        if branch_name:
+            cmd = ["git", "push", "origin", "-u", branch_name]
+        else:
+            cmd = ["git", "push", "-u", "origin"]
 
         subprocess.run(cmd, capture_output=True, text=True)
 
