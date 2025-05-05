@@ -1691,6 +1691,25 @@ class Commands:
         self.cmd_plan_implementation(path_to_ticket)
         implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
 
+        # Commit the implementation plan if repo exists
+        if self.coder.repo:
+            # Check if the implementation plan file exists
+            if os.path.exists(implementation_plan):
+                try:
+                    # Add the implementation plan file to git staging
+                    self.coder.repo.repo.git.add(implementation_plan)
+                    # Create a commit with a descriptive message
+                    self.coder.repo.commit(
+                        fnames=[implementation_plan],
+                        message=f"Add implementation plan for JIRA issue {issue_key_or_id}",
+                        aider_edits=True
+                    )
+                    self.io.tool_output(f"Committed implementation plan for JIRA issue {issue_key_or_id}")
+                except ANY_GIT_ERROR as err:
+                    self.io.tool_error(f"Unable to commit implementation plan: {err}")
+            else:
+                self.io.tool_error(f"Implementation plan file not found: {implementation_plan}")
+
         self._clear_chat_history()
         self._drop_all_files()
 
