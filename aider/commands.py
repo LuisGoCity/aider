@@ -1690,6 +1690,18 @@ class Commands:
         )
         self.cmd_plan_implementation(path_to_ticket)
         implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
+        
+        # Commit the implementation plan file first
+        if self.coder.repo:
+            try:
+                # Add the implementation plan to git
+                self.coder.repo.repo.git.add(implementation_plan)
+                # Commit the implementation plan with a descriptive message
+                commit_message = f"Add implementation plan for {issue_key_or_id}"
+                self.coder.repo.commit(message=commit_message)
+                self.io.tool_output(f"Committed implementation plan: {implementation_plan}")
+            except ANY_GIT_ERROR as err:
+                self.io.tool_error(f"Unable to commit implementation plan: {err}")
 
         self._clear_chat_history()
         self._drop_all_files()
