@@ -2970,9 +2970,73 @@ class TestCommands(TestCase):
                     mock.patch.object(commands, "cmd_plan_implementation"),
                     mock.patch("os.path.splitext", return_value=["jira_issue_TEST-123", "_implementation_plan.md"]),
                     mock.patch("os.path.exists", return_value=False),
-                    mock.patch.object(io, "tool_warning") as mock_tool_warning,
+                    mock.patch.object(io, "tool_error") as mock_tool_error,
                 ):
-                    # Mock _commit_file to simulate the file not existing
-                    with mock.patch.object(commands, "_commit_file", return_value=False):
-                        commands.cmd_solve_jira("TEST-123")
-                        # The function should continue execution even if the file doesn't exist
+                    commands.cmd_solve_jira("TEST-123")
+                    mock_tool_error.assert_any_call("Implementation plan file was not created: jira_issue_TEST-123_implementation_plan.md")
+            
+            # Test case 3: Error retrieving JIRA issue
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.side_effect = Exception("API error")
+                
+                with mock.patch.object(io, "tool_error") as mock_tool_error:
+                    commands.cmd_solve_jira("TEST-123")
+                    mock_tool_error.assert_any_call("Failed to retrieve JIRA issue: API error")
+            
+            # Test case 4: Error in cmd_plan_implementation
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                
+                with (
+                    mock.patch("json.dumps", return_value="{}"),
+                    mock.patch.object(io, "write_text"),
+                    mock.patch.object(commands, "cmd_plan_implementation", side_effect=Exception("Planning error")),
+                    mock.patch.object(io, "tool_error") as mock_tool_error,
+                ):
+                    commands.cmd_solve_jira("TEST-123")
+                    mock_tool_error.assert_any_call("Failed to create implementation plan: Planning error")
+            
+            # Test case 5: Error in cmd_code_from_plan
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                
+                with (
+                    mock.patch("json.dumps", return_value="{}"),
+                    mock.patch.object(io, "write_text"),
+                    mock.patch.object(commands, "cmd_plan_implementation"),
+                    mock.patch("os.path.splitext", return_value=["jira_issue_TEST-123", "_implementation_plan.md"]),
+                    mock.patch("os.path.exists", return_value=True),
+                    mock.patch.object(commands, "_commit_file", return_value=True),
+                    mock.patch.object(commands, "_clear_chat_history"),
+                    mock.patch.object(commands, "_drop_all_files"),
+                    mock.patch.object(commands, "cmd_code_from_plan", side_effect=Exception("Implementation error")),
+                    mock.patch.object(commands, "_delete_and_commit_file"),
+                    mock.patch.object(io, "tool_error") as mock_tool_error,
+                ):
+                    commands.cmd_solve_jira("TEST-123")
+                    mock_tool_error.assert_any_call("Error implementing code from plan: Implementation error")
+            
+            # Test case 6: Error in cmd_raise_pr
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                
+                with (
+                    mock.patch("json.dumps", return_value="{}"),
+                    mock.patch.object(io, "write_text"),
+                    mock.patch.object(commands, "cmd_plan_implementation"),
+                    mock.patch("os.path.splitext", return_value=["jira_issue_TEST-123", "_implementation_plan.md"]),
+                    mock.patch("os.path.exists", return_value=True),
+                    mock.patch.object(commands, "_commit_file", return_value=True),
+                    mock.patch.object(commands, "_clear_chat_history"),
+                    mock.patch.object(commands, "_drop_all_files"),
+                    mock.patch.object(commands, "cmd_code_from_plan"),
+                    mock.patch.object(commands, "_delete_and_commit_file"),
+                    mock.patch.object(commands, "cmd_raise_pr", side_effect=Exception("PR error")),
+                    mock.patch.object(io, "tool_error") as mock_tool_error,
+                ):
+                    commands.cmd_solve_jira("TEST-123 --with-pr")
+                    mock_tool_error.assert_any_call("Failed to raise PR: PR error")

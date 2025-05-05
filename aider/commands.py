@@ -1729,41 +1729,68 @@ class Commands:
             self.io.tool_error("Please provide a JIRA issue key or ID")
             return
 
-        from .jira import Jira
+        try:
+            from .jira import Jira
+            
+            try:
+                jira = Jira()
+                jira_ticket = jira.get_issue_content(issue_key_or_id)
+                path_to_ticket = f"jira_issue_{issue_key_or_id}.txt"
+                self.io.write_text(
+                    filename=path_to_ticket, content=json.dumps(jira_ticket, ensure_ascii=False)
+                )
+            except Exception as err:
+                self.io.tool_error(f"Failed to retrieve JIRA issue: {err}")
+                return
+                
+            try:
+                self.cmd_plan_implementation(path_to_ticket)
+                implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
+                
+                # Check if implementation plan was created
+                if not os.path.exists(implementation_plan):
+                    self.io.tool_error(f"Implementation plan file was not created: {implementation_plan}")
+                    return
+                    
+                # Commit the implementation plan file first
+                if not self._commit_file(
+                    implementation_plan, 
+                    f"Add implementation plan for {issue_key_or_id}"
+                ):
+                    self.io.tool_warning("Failed to commit implementation plan, continuing with implementation")
+            except Exception as err:
+                self.io.tool_error(f"Failed to create implementation plan: {err}")
+                return
 
-        jira = Jira()
-        jira_ticket = jira.get_issue_content(issue_key_or_id)
-        path_to_ticket = f"jira_issue_{issue_key_or_id}.txt"
-        self.io.write_text(
-            filename=path_to_ticket, content=json.dumps(jira_ticket, ensure_ascii=False)
-        )
-        self.cmd_plan_implementation(path_to_ticket)
-        implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
-        
-        # Commit the implementation plan file first
-        self._commit_file(
-            implementation_plan, 
-            f"Add implementation plan for {issue_key_or_id}"
-        )
+            self._clear_chat_history()
+            self._drop_all_files()
 
-        self._clear_chat_history()
-        self._drop_all_files()
+            try:
+                self.cmd_code_from_plan(implementation_plan, switch_coder=False)
+            except Exception as err:
+                self.io.tool_error(f"Error implementing code from plan: {err}")
+                # Continue with cleanup even if implementation fails
 
-        self.cmd_code_from_plan(implementation_plan, switch_coder=False)
+            # Clean up files before raising PR
+            if os.path.exists(implementation_plan):
+                self._delete_and_commit_file(
+                    implementation_plan,
+                    f"Remove implementation plan file for {issue_key_or_id}"
+                )
+            
+            if os.path.exists(path_to_ticket):
+                self._delete_and_commit_file(
+                    path_to_ticket,
+                    f"Remove JIRA ticket file for {issue_key_or_id}"
+                )
 
-        # Clean up files before raising PR
-        self._delete_and_commit_file(
-            implementation_plan,
-            f"Remove implementation plan file for {issue_key_or_id}"
-        )
-        
-        self._delete_and_commit_file(
-            path_to_ticket,
-            f"Remove JIRA ticket file for {issue_key_or_id}"
-        )
-
-        if with_pr:
-            self.cmd_raise_pr()
+            if with_pr:
+                try:
+                    self.cmd_raise_pr()
+                except Exception as err:
+                    self.io.tool_error(f"Failed to raise PR: {err}")
+        except Exception as err:
+            self.io.tool_error(f"Unexpected error in cmd_solve_jira: {err}")
 
     def cmd_plan_implementation(self, args):
         "Generate an implementation plan from a JIRA ticket or feature specification file"
