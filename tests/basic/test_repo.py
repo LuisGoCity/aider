@@ -843,7 +843,7 @@ class TestRepo(unittest.TestCase):
                 self.assertEqual(error, "Network error")
 
     def test_raise_pr_error_handling(self):
-        """Test that raise_pr handles errors from GitHub CLI gracefully"""
+        """Test that raise_pr handles errors gracefully in various scenarios"""
         with GitTemporaryDirectory():
             # Create a new repo
             raw_repo = git.Repo()
@@ -869,17 +869,71 @@ class TestRepo(unittest.TestCase):
             io = InputOutput()
             git_repo = GitRepo(io, None, None)
 
-            # Mock subprocess.run to simulate PR creation failure
-            mock_result = unittest.mock.Mock()
-            mock_result.returncode = 1
-            mock_result.stderr = "Error: failed to create PR\n"
-
-            with patch("subprocess.run", return_value=mock_result) as mock_run:
+            # Test 1: PR creation failure after successful push
+            # Mock subprocess.run to simulate successful push but PR creation failure
+            mock_push_success = unittest.mock.Mock()
+            mock_push_success.returncode = 0
+            mock_push_success.stdout = "Everything up-to-date\n"
+            
+            mock_pr_failure = unittest.mock.Mock()
+            mock_pr_failure.returncode = 1
+            mock_pr_failure.stderr = "Error: failed to create PR\n"
+            
+            with patch("subprocess.run", side_effect=[mock_push_success, mock_pr_failure]) as mock_run:
                 # Call raise_pr method
-                git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
-
-                # Verify subprocess.run was called
+                result = git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+                
+                # Verify result is False (failure)
+                self.assertFalse(result)
+                
+                # Verify subprocess.run was called twice (push succeeded, PR creation failed)
                 self.assertEqual(mock_run.call_count, 2)
 
-                # Verify the correct error message was output
-                # We can't directly check IO output, but the implementation should handle the error
+            # Test 2: Push failure prevents PR creation attempt
+            # Mock subprocess.run to simulate push failure
+            mock_push_failure = unittest.mock.Mock()
+            mock_push_failure.returncode = 1
+            mock_push_failure.stderr = "error: failed to push some refs\n"
+            
+            with patch("subprocess.run", return_value=mock_push_failure) as mock_run:
+                # Call raise_pr method
+                result = git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+                
+                # Verify result is False (failure)
+                self.assertFalse(result)
+                
+                # Verify subprocess.run was called only once (push failed, PR creation not attempted)
+                self.assertEqual(mock_run.call_count, 1)
+                
+                # Verify the push command was called with correct arguments
+                args = mock_run.call_args[0][0]
+                self.assertEqual(args, ["git", "push", "origin", "-u", "feature"])
+
+            # Test 3: Branch name detection failure
+            # Mock get_current_branch_name to return None (simulating detection failure)
+            with patch.object(git_repo, "get_current_branch_name", return_value=None):
+                # Call raise_pr method without explicit branch name
+                result = git_repo.raise_pr("master", None, "Test PR Title", "Test PR Description")
+                
+                # Verify result is False (failure)
+                self.assertFalse(result)
+                
+                # Verify no subprocess calls were made
+                with patch("subprocess.run") as mock_run:
+                    result = git_repo.raise_pr("master", None, "Test PR Title", "Test PR Description")
+                    mock_run.assert_not_called()
+
+            # Test 4: GitHub CLI not available
+            with patch("subprocess.run", side_effect=FileNotFoundError()) as mock_run:
+                # Reset IO to capture new messages
+                io = InputOutput()
+                git_repo = GitRepo(io, None, None)
+
+                # Call raise_pr method
+                result = git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+                
+                # Verify result is False (failure)
+                self.assertFalse(result)
+                
+                # Verify subprocess.run was called once
+                mock_run.assert_called_once()
