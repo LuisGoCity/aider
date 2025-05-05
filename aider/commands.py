@@ -1737,6 +1737,28 @@ class Commands:
             except ANY_GIT_ERROR as err:
                 self.io.tool_error(f"Unable to commit deletion of implementation plan: {err}")
 
+        # Delete the JIRA ticket file before raising PR
+        if self.coder.repo and os.path.exists(path_to_ticket):
+            try:
+                # Remove the file from the file system
+                os.remove(path_to_ticket)
+                self.io.tool_output(f"Deleted JIRA ticket file: {path_to_ticket}")
+                
+                # Add the deletion to git staging
+                self.coder.repo.repo.git.add(path_to_ticket)
+                
+                # Create a commit for the deletion
+                self.coder.repo.commit(
+                    fnames=[path_to_ticket],
+                    message=f"Remove JIRA ticket file for issue {issue_key_or_id}",
+                    aider_edits=True
+                )
+                self.io.tool_output(f"Committed deletion of JIRA ticket file for issue {issue_key_or_id}")
+            except OSError as err:
+                self.io.tool_error(f"Unable to delete JIRA ticket file: {err}")
+            except ANY_GIT_ERROR as err:
+                self.io.tool_error(f"Unable to commit deletion of JIRA ticket file: {err}")
+
         if with_pr:
             self.cmd_raise_pr()
 
