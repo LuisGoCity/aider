@@ -506,11 +506,9 @@ class GitRepo:
                   if the push failed (None if successful).
         """
         if not branch_name:
-            self.io.tool_output("no branch_name")
             branch_name = self.repo.active_branch.name
 
         if branch_name:
-            self.io.tool_output(f"{branch_name=} of type {type(branch_name)}")
             cmd = ["git", "push", "origin", "-u", branch_name]
         else:
             # Fallback to original behavior if branch name cannot be determined
@@ -562,12 +560,10 @@ class GitRepo:
 
         if gh_available:
             # Push changes to remote with the specific branch name
-            self.io.tool_output("pushing committed changes")
             success, error_message = self.push_commited_changes(branch_name=compare_branch.name)
             if not success:
                 self.io.tool_error(f"Failed to push changes before creating PR: {error_message}")
                 return False
-            self.io.tool_output(f"{compare_branch=} of type {type(compare_branch)}")
             cmd = [
                 "gh",
                 "pr",
