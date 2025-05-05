@@ -564,7 +564,12 @@ class GitRepo:
             pass
 
         if gh_available:
-            self.push_commited_changes()
+            # Push changes to remote with the specific branch name
+            success, error_message = self.push_commited_changes(branch_name=compare_branch)
+            if not success:
+                self.io.tool_error(f"Failed to push changes before creating PR: {error_message}")
+                return False
+                
             cmd = [
                 "gh",
                 "pr",
@@ -584,8 +589,11 @@ class GitRepo:
             if result.returncode == 0:
                 pr_url = result.stdout.strip()
                 self.io.tool_output(f"PR created successfully: {pr_url}")
+                return True
             else:
                 self.io.tool_error(f"Failed to create PR: {result.stderr}")
+                return False
         else:
             self.io.tool_error("GitHub CLI (gh) not found. Please install it to create PRs.")
             self.io.tool_output("You can create the PR manually using this description.")
+            return False
