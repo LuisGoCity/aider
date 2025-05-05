@@ -704,7 +704,8 @@ class TestRepo(unittest.TestCase):
                 self.assertEqual(args, ["git", "push", "origin", "-u", "main"])
             
             # Test 2: Successful push with auto-detected branch name
-            with patch.object(git_repo, "get_current_branch_name", return_value="feature"):
+            with patch.object(git_repo.repo, "active_branch", create=True) as mock_branch:
+                mock_branch.name = "feature"
                 with patch("subprocess.run") as mock_run:
                     # Configure mock to simulate successful push
                     mock_result = unittest.mock.Mock()
