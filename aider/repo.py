@@ -551,7 +551,18 @@ class GitRepo:
             return False, str(e)
 
     def raise_pr(self, base_branch, compare_branch, pr_title, pr_description):
-        """Raise a PR via the git cli."""
+        """
+        Raise a PR via the git cli.
+        
+        Args:
+            base_branch: The target branch for the PR
+            compare_branch: The source branch containing the changes
+            pr_title: Title for the PR
+            pr_description: Description for the PR
+            
+        Returns:
+            bool: True if PR was created successfully, False otherwise
+        """
         # Check if GitHub CLI is available
         gh_available = False
         try:
@@ -561,7 +572,21 @@ class GitRepo:
             pass
 
         if gh_available:
-            self.push_commited_changes()
+            # Get the current branch name if compare_branch is not specified
+            branch_to_push = compare_branch
+            if not branch_to_push:
+                branch_to_push = self.get_current_branch_name()
+                if not branch_to_push:
+                    self.io.tool_error("Could not determine branch name for push. Aborting PR creation.")
+                    return False
+            
+            # Push changes with tracking branch setup
+            success, error_message = self.push_commited_changes(branch_to_push)
+            if not success:
+                self.io.tool_error(f"Failed to push changes: {error_message}")
+                self.io.tool_error("Aborting PR creation due to push failure.")
+                return False
+                
             cmd = [
                 "gh",
                 "pr",
@@ -569,7 +594,7 @@ class GitRepo:
                 "--base",
                 str(base_branch),
                 "--head",
-                str(compare_branch),
+                str(compare_branch or branch_to_push),
                 "--title",
                 pr_title,
                 "--body",
@@ -581,8 +606,11 @@ class GitRepo:
             if result.returncode == 0:
                 pr_url = result.stdout.strip()
                 self.io.tool_output(f"PR created successfully: {pr_url}")
+                return True
             else:
                 self.io.tool_error(f"Failed to create PR: {result.stderr}")
+                return False
         else:
             self.io.tool_error("GitHub CLI (gh) not found. Please install it to create PRs.")
             self.io.tool_output("You can create the PR manually using this description.")
+            return False
