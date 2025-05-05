@@ -562,7 +562,7 @@ class GitRepo:
 
         if gh_available:
             # Push changes to remote with the specific branch name
-            self.io("pushing committed changes")
+            self.io.tool_output("pushing committed changes")
             success, error_message = self.push_commited_changes(branch_name=compare_branch)
             if not success:
                 self.io.tool_error(f"Failed to push changes before creating PR: {error_message}")
