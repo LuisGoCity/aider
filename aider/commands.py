@@ -1664,6 +1664,8 @@ class Commands:
         parts = args.split()
         with_pr = False
         issue_key_or_id = None
+        path_to_ticket = None
+        implementation_plan = None
 
         for i, part in enumerate(parts):
             if part.lower() in ("--with-pr", "-pr"):
@@ -1682,14 +1684,31 @@ class Commands:
 
         from .jira import Jira
 
-        jira = Jira()
-        jira_ticket = jira.get_issue_content(issue_key_or_id)
-        path_to_ticket = f"jira_issue_{issue_key_or_id}.txt"
-        self.io.write_text(
-            filename=path_to_ticket, content=json.dumps(jira_ticket, ensure_ascii=False)
-        )
-        self.cmd_plan_implementation(path_to_ticket)
-        implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
+        try:
+            jira = Jira()
+        except ValueError as e:
+            self.io.tool_error(f"JIRA configuration error: {e}")
+            return
+        
+        try:
+            jira_ticket = jira.get_issue_content(issue_key_or_id)
+            path_to_ticket = f"jira_issue_{issue_key_or_id}.txt"
+            self.io.write_text(
+                filename=path_to_ticket, content=json.dumps(jira_ticket, ensure_ascii=False)
+            )
+            self.io.tool_output(f"Created JIRA ticket file: {path_to_ticket}")
+        except ValueError as e:
+            self.io.tool_error(f"JIRA API error: {e}")
+            return
+        except Exception as e:
+            self.io.tool_error(f"Failed to fetch JIRA issue: {e}")
+            return
+        try:
+            self.cmd_plan_implementation(path_to_ticket)
+            implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
+        except Exception as e:
+            self.io.tool_error(f"Failed to plan implementation: {e}")
+            return
 
         # Commit the implementation plan if repo exists
         if self.coder.repo:
@@ -1707,20 +1726,42 @@ class Commands:
                     self.io.tool_output(f"Committed implementation plan for JIRA issue {issue_key_or_id}")
                 except ANY_GIT_ERROR as err:
                     self.io.tool_error(f"Unable to commit implementation plan: {err}")
+                    # Continue despite git error, as we can still implement the solution
             else:
                 self.io.tool_error(f"Implementation plan file not found: {implementation_plan}")
+                # If implementation plan doesn't exist, we might need to abort
+                if not self.io.confirm_ask(
+                    "Implementation plan file not found. Continue without it?",
+                    default="n"
+                ):
+                    return
 
-        self._clear_chat_history()
-        self._drop_all_files()
+        try:
+            self._clear_chat_history()
+            self._drop_all_files()
+        except Exception as e:
+            self.io.tool_warning(f"Error clearing chat history: {e}")
+            # Continue despite error
 
-        self.cmd_code_from_plan(implementation_plan, switch_coder=False)
+        try:
+            self.cmd_code_from_plan(implementation_plan, switch_coder=False)
+        except Exception as e:
+            self.io.tool_error(f"Failed to implement solution from plan: {e}")
+            # Ask if user wants to continue with PR despite implementation failure
+            if with_pr and not self.io.confirm_ask(
+                "Implementation failed. Continue with PR creation?",
+                default="n"
+            ):
+                return
 
         # Delete the implementation plan file before raising PR
+        implementation_plan_deleted = False
         if self.coder.repo and os.path.exists(implementation_plan):
             try:
                 # Remove the file from the file system
                 os.remove(implementation_plan)
                 self.io.tool_output(f"Deleted implementation plan file: {implementation_plan}")
+                implementation_plan_deleted = True
                 
                 # Add the deletion to git staging
                 self.coder.repo.repo.git.add(implementation_plan)
@@ -1732,17 +1773,26 @@ class Commands:
                     aider_edits=True
                 )
                 self.io.tool_output(f"Committed deletion of implementation plan for JIRA issue {issue_key_or_id}")
+            except FileNotFoundError:
+                self.io.tool_warning(f"Implementation plan file already deleted or not found: {implementation_plan}")
+            except PermissionError as err:
+                self.io.tool_error(f"Permission denied when deleting implementation plan file: {err}")
             except OSError as err:
                 self.io.tool_error(f"Unable to delete implementation plan file: {err}")
             except ANY_GIT_ERROR as err:
-                self.io.tool_error(f"Unable to commit deletion of implementation plan: {err}")
+                if implementation_plan_deleted:
+                    self.io.tool_warning(f"File deleted but unable to commit deletion: {err}")
+                else:
+                    self.io.tool_error(f"Unable to commit deletion of implementation plan: {err}")
 
         # Delete the JIRA ticket file before raising PR
-        if self.coder.repo and os.path.exists(path_to_ticket):
+        ticket_file_deleted = False
+        if self.coder.repo and path_to_ticket and os.path.exists(path_to_ticket):
             try:
                 # Remove the file from the file system
                 os.remove(path_to_ticket)
                 self.io.tool_output(f"Deleted JIRA ticket file: {path_to_ticket}")
+                ticket_file_deleted = True
                 
                 # Add the deletion to git staging
                 self.coder.repo.repo.git.add(path_to_ticket)
@@ -1754,10 +1804,17 @@ class Commands:
                     aider_edits=True
                 )
                 self.io.tool_output(f"Committed deletion of JIRA ticket file for issue {issue_key_or_id}")
+            except FileNotFoundError:
+                self.io.tool_warning(f"JIRA ticket file already deleted or not found: {path_to_ticket}")
+            except PermissionError as err:
+                self.io.tool_error(f"Permission denied when deleting JIRA ticket file: {err}")
             except OSError as err:
                 self.io.tool_error(f"Unable to delete JIRA ticket file: {err}")
             except ANY_GIT_ERROR as err:
-                self.io.tool_error(f"Unable to commit deletion of JIRA ticket file: {err}")
+                if ticket_file_deleted:
+                    self.io.tool_warning(f"File deleted but unable to commit deletion: {err}")
+                else:
+                    self.io.tool_error(f"Unable to commit deletion of JIRA ticket file: {err}")
 
         if with_pr:
             # Verify all necessary files have been committed before raising PR
@@ -1769,12 +1826,32 @@ class Commands:
                         uncommitted_changes = True
                         self.io.tool_warning("There are uncommitted changes in the repository.")
                         self.io.tool_warning("Consider committing these changes before raising a PR.")
+                        
+                        # Ask user if they want to continue with PR creation despite uncommitted changes
+                        if not self.io.confirm_ask(
+                            "Continue with PR creation despite uncommitted changes?",
+                            default="n"
+                        ):
+                            self.io.tool_output("PR creation aborted. Please commit your changes first.")
+                            return
             except ANY_GIT_ERROR as err:
                 self.io.tool_error(f"Unable to check git status: {err}")
+                # Ask user if they want to continue with PR creation despite git error
+                if not self.io.confirm_ask(
+                    "Unable to check git status. Continue with PR creation anyway?",
+                    default="n"
+                ):
+                    self.io.tool_output("PR creation aborted.")
+                    return
             
             # Proceed with PR creation
-            self.io.tool_output("Creating pull request with all committed changes...")
-            self.cmd_raise_pr()
+            try:
+                self.io.tool_output("Creating pull request with all committed changes...")
+                self.cmd_raise_pr()
+                self.io.tool_output(f"Successfully completed implementation of JIRA issue {issue_key_or_id}")
+            except Exception as e:
+                self.io.tool_error(f"Failed to create PR: {e}")
+                self.io.tool_output("You can manually create a PR using your git provider's interface.")
 
     def cmd_plan_implementation(self, args):
         "Generate an implementation plan from a JIRA ticket or feature specification file"
