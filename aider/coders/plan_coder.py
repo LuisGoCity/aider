@@ -42,14 +42,16 @@ class PlanCoder(Coder):
                 f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\nFor each step,"
                 " indicate what files will need editing (if any) based on the dictionary of"
                 f" identifiedfiles below:\n {json.dumps(affected_files)}. DO NOT WRITE CODE"
-                " SNIPPETS SHOWING HOW TO IMPLEMENT EACH STEP."
+                " SNIPPETS SHOWING HOW TO IMPLEMENT EACH STEP. Only include steps required to"
+                " accomplish the goal in the JIRA ticket, do not add any unnecessary steps / code."
             )
         else:
             message = (
                 "Please create a more detailed implementation plan for this JIRA"
                 f" ticket:\n\n{ticket_content}\n\nInitial plan:\n{initial_plan}\n\ninclude a"
                 f" reference to the list of files below:\n {affected_files}.DO NOT WRITE CODE"
-                " SNIPPETS SHOWING HOW TO IMPLEMENT EACH STEP."
+                " SNIPPETS SHOWING HOW TO IMPLEMENT EACH STEP. Only include steps required to"
+                " accomplish the goal in the JIRA ticket, do not add any unnecessary steps / code."
             )
 
         self.run_one(message, preproc=False)
