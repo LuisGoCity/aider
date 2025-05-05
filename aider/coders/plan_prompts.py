@@ -30,5 +30,15 @@ class PlanPrompts(CoderPrompts):
 
     system_reminder = (
         "The output of your work is an implementation plan in a markdown file. Do not include steps"
-        " like:'analyse code base'."
+        " like:'analyse code base'. Make sure the only changes in the final step plan are the ones"
+        " required in the feature specification."
+    )
+    system_reminder += (
+        "Any steps revolving around tests should only consider one step i.e. if a step is about "
+        "multiple tests, it should be broken down into as many steps."
+    )
+
+    system_reminder += (
+        "Avoid adding unncesseary steps about refactoring and error handling if nnot included in"
+        " the ticket"
     )
