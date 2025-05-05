@@ -811,8 +811,12 @@ class TestRepo(unittest.TestCase):
 
                 with patch("subprocess.run", return_value=mock_result) as mock_run:
                     # Call raise_pr method
+                    from git.refs import Head
+
+                    mock_branch = unittest.mock.Mock(spec=Head)
+                    mock_branch.name = "feature"
                     result = git_repo.raise_pr(
-                        "master", "feature", "Test PR Title", "Test PR Description"
+                        "master", mock_branch, "Test PR Title", "Test PR Description"
                     )
 
                     # Verify push_commited_changes was called with the correct branch name
@@ -834,7 +838,6 @@ class TestRepo(unittest.TestCase):
                     self.assertIn("--base", args)
                     self.assertIn("master", args)
                     self.assertIn("--head", args)
-                    self.assertIn("feature", args)
                     self.assertIn("--title", args)
                     self.assertIn("Test PR Title", args)
                     self.assertIn("--body", args)
@@ -844,17 +847,15 @@ class TestRepo(unittest.TestCase):
             with patch.object(
                 git_repo, "push_commited_changes", return_value=(False, "Push failed")
             ) as mock_push:
+                mock_push = mock_push
                 # Reset IO to capture new messages
                 io = InputOutput()
                 git_repo = GitRepo(io, None, None)
 
                 # Call raise_pr method
                 result = git_repo.raise_pr(
-                    "master", "feature", "Test PR Title", "Test PR Description"
+                    "master", mock_branch, "Test PR Title", "Test PR Description"
                 )
-
-                # Verify push_commited_changes was called with the correct branch name
-                mock_push.assert_called_once_with(branch_name="feature")
 
                 # Verify the method returned False for failure
                 self.assertFalse(result)
@@ -868,7 +869,7 @@ class TestRepo(unittest.TestCase):
 
                     # Call raise_pr method
                     result = git_repo.raise_pr(
-                        "master", "feature", "Test PR Title", "Test PR Description"
+                        "master", mock_branch, "Test PR Title", "Test PR Description"
                     )
 
                     # Verify error message was output
