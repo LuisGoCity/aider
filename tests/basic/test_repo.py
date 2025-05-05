@@ -707,7 +707,9 @@ class TestRepo(unittest.TestCase):
             from git.refs import Head
             mock_branch = unittest.mock.Mock(spec=Head)
             mock_branch.name = "feature"
-            with patch.object(git_repo.repo, "active_branch", mock_branch):
+            
+            # Use PropertyMock for active_branch property
+            with patch("git.repo.base.Repo.active_branch", new_callable=unittest.mock.PropertyMock, return_value=mock_branch):
                 with patch("subprocess.run") as mock_run:
                     # Configure mock to simulate successful push
                     mock_result = unittest.mock.Mock()
