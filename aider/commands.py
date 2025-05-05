@@ -1760,6 +1760,20 @@ class Commands:
                 self.io.tool_error(f"Unable to commit deletion of JIRA ticket file: {err}")
 
         if with_pr:
+            # Verify all necessary files have been committed before raising PR
+            uncommitted_changes = False
+            try:
+                if self.coder.repo:
+                    status = self.coder.repo.repo.git.status(porcelain=True)
+                    if status.strip():
+                        uncommitted_changes = True
+                        self.io.tool_warning("There are uncommitted changes in the repository.")
+                        self.io.tool_warning("Consider committing these changes before raising a PR.")
+            except ANY_GIT_ERROR as err:
+                self.io.tool_error(f"Unable to check git status: {err}")
+            
+            # Proceed with PR creation
+            self.io.tool_output("Creating pull request with all committed changes...")
             self.cmd_raise_pr()
 
     def cmd_plan_implementation(self, args):
