@@ -1708,6 +1708,30 @@ class Commands:
 
         self.cmd_code_from_plan(implementation_plan, switch_coder=False)
 
+        # Clean up files before raising PR
+        if self.coder.repo:
+            # Delete and commit the implementation plan file
+            if os.path.exists(implementation_plan):
+                try:
+                    os.remove(implementation_plan)
+                    self.coder.repo.repo.git.add(implementation_plan)
+                    commit_message = f"Remove implementation plan file for {issue_key_or_id}"
+                    self.coder.repo.commit(message=commit_message)
+                    self.io.tool_output(f"Removed and committed deletion of: {implementation_plan}")
+                except ANY_GIT_ERROR as err:
+                    self.io.tool_error(f"Unable to remove implementation plan file: {err}")
+            
+            # Delete and commit the JIRA ticket file
+            if os.path.exists(path_to_ticket):
+                try:
+                    os.remove(path_to_ticket)
+                    self.coder.repo.repo.git.add(path_to_ticket)
+                    commit_message = f"Remove JIRA ticket file for {issue_key_or_id}"
+                    self.coder.repo.commit(message=commit_message)
+                    self.io.tool_output(f"Removed and committed deletion of: {path_to_ticket}")
+                except ANY_GIT_ERROR as err:
+                    self.io.tool_error(f"Unable to remove JIRA ticket file: {err}")
+
         if with_pr:
             self.cmd_raise_pr()
 
