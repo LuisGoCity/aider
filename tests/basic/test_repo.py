@@ -692,46 +692,76 @@ class TestRepo(unittest.TestCase):
             io = InputOutput()
             git_repo = GitRepo(io, None, None)
 
-            # Mock subprocess.run to simulate successful PR creation
+            # Test 1: Successful PR creation with explicit branch name
+            # Mock subprocess.run to simulate successful push and PR creation
             pr_url = "https://github.com/user/repo/pull/123"
-            mock_result = unittest.mock.Mock()
-            mock_result.returncode = 0
-            mock_result.stdout = pr_url + "\n"
+            mock_success = unittest.mock.Mock()
+            mock_success.returncode = 0
+            mock_success.stdout = pr_url + "\n"
 
-            with patch("subprocess.run", return_value=mock_result) as mock_run:
-                # Call raise_pr method
-                git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+            with patch("subprocess.run", return_value=mock_success) as mock_run:
+                # Call raise_pr method with explicit branch name
+                result = git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+                
+                # Verify result is True (success)
+                self.assertTrue(result)
 
-                # Verify subprocess.run was called
-                mock_run.assert_called()
+                # Verify subprocess.run was called twice (once for push, once for PR creation)
+                self.assertEqual(mock_run.call_count, 2)
+                
+                # Get the commands that were passed to subprocess.run
+                push_args = mock_run.call_args_list[0][0][0]
+                pr_args = mock_run.call_args_list[1][0][0]
+                
+                # Check that the push command is correct with branch name and -u flag
+                self.assertEqual(push_args, ["git", "push", "origin", "-u", "feature"])
+                
+                # Check that the PR command contains all the expected parts
+                self.assertIn("gh", pr_args)
+                self.assertIn("pr", pr_args)
+                self.assertIn("create", pr_args)
+                self.assertIn("--base", pr_args)
+                self.assertIn("master", pr_args)
+                self.assertIn("--head", pr_args)
+                self.assertIn("feature", pr_args)
+                self.assertIn("--title", pr_args)
+                self.assertIn("Test PR Title", pr_args)
+                self.assertIn("--body", pr_args)
+                self.assertIn("Test PR Description", pr_args)
 
-                # Get the command that was passed to subprocess.run
-                args = mock_run.call_args[0][0]
+            # Test 2: Successful PR creation with current branch detection
+            # Mock get_current_branch_name to return a branch name
+            with patch.object(git_repo, "get_current_branch_name", return_value="current-branch"):
+                with patch("subprocess.run", return_value=mock_success) as mock_run:
+                    # Call raise_pr method without explicit branch name
+                    result = git_repo.raise_pr("master", None, "Test PR Title", "Test PR Description")
+                    
+                    # Verify result is True (success)
+                    self.assertTrue(result)
+                    
+                    # Verify subprocess.run was called twice
+                    self.assertEqual(mock_run.call_count, 2)
+                    
+                    # Get the push command
+                    push_args = mock_run.call_args_list[0][0][0]
+                    
+                    # Check that the push command uses the detected branch name
+                    self.assertEqual(push_args, ["git", "push", "origin", "-u", "current-branch"])
 
-                # Check that the command contains all the expected parts
-                self.assertIn("gh", args)
-                self.assertIn("pr", args)
-                self.assertIn("create", args)
-                self.assertIn("--base", args)
-                self.assertIn("master", args)
-                self.assertIn("--head", args)
-                self.assertIn("feature", args)
-                self.assertIn("--title", args)
-                self.assertIn("Test PR Title", args)
-                self.assertIn("--body", args)
-                self.assertIn("Test PR Description", args)
-
-            # Test when GitHub CLI is not available
+            # Test 3: When GitHub CLI is not available
             with patch("subprocess.run", side_effect=FileNotFoundError()) as mock_run:
                 # Reset IO to capture new messages
                 io = InputOutput()
                 git_repo = GitRepo(io, None, None)
 
                 # Call raise_pr method
-                git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
-
-                # Verify error message was output
-                mock_run.assert_called()
+                result = git_repo.raise_pr("master", "feature", "Test PR Title", "Test PR Description")
+                
+                # Verify result is False (failure)
+                self.assertFalse(result)
+                
+                # Verify subprocess.run was called
+                mock_run.assert_called_once()
 
     def test_push_commited_changes(self):
         """Test that push_commited_changes correctly constructs git push commands with branch name"""
