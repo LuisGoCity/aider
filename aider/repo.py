@@ -492,10 +492,29 @@ class GitRepo:
         except ANY_GIT_ERROR as e:
             raise e
 
+    def get_current_branch_name(self):
+        """
+        Get the name of the current git branch.
+        
+        Returns:
+            str: The name of the current branch or None if in detached HEAD state
+        """
+        try:
+            if self.repo.head.is_detached:
+                return None
+            return self.repo.active_branch.name
+        except ANY_GIT_ERROR:
+            # Handle various git errors or detached HEAD state
+            return None
+
     def push_commited_changes(self, branch_name=None):
+        if not branch_name:
+            branch_name = self.get_current_branch_name()
+            
         if branch_name:
             cmd = ["git", "push", "origin", "-u", branch_name]
         else:
+            # Fallback to original behavior if branch name cannot be determined
             cmd = ["git", "push", "-u", "origin"]
 
         subprocess.run(cmd, capture_output=True, text=True)
