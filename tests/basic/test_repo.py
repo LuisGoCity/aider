@@ -733,6 +733,85 @@ class TestRepo(unittest.TestCase):
                 # Verify error message was output
                 mock_run.assert_called()
 
+    def test_push_commited_changes(self):
+        """Test that push_commited_changes correctly constructs git push commands with branch name"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a file and make initial commit
+            fname = Path("test_file.txt")
+            fname.write_text("initial content")
+            raw_repo.git.add(str(fname))
+            raw_repo.git.commit("-m", "Initial commit")
+
+            # Create GitRepo instance with mock IO
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+
+            # Test 1: Push with explicit branch name
+            # Mock subprocess.run to simulate successful push
+            mock_success = unittest.mock.Mock()
+            mock_success.returncode = 0
+            mock_success.stdout = "Everything up-to-date\n"
+
+            with patch("subprocess.run", return_value=mock_success) as mock_run:
+                # Call push_commited_changes with branch name
+                success, error = git_repo.push_commited_changes("feature-branch")
+
+                # Verify subprocess.run was called with correct arguments
+                mock_run.assert_called_once()
+                args = mock_run.call_args[0][0]
+                self.assertEqual(args, ["git", "push", "origin", "-u", "feature-branch"])
+                
+                # Verify success status
+                self.assertTrue(success)
+                self.assertIsNone(error)
+
+            # Test 2: Push without branch name
+            with patch("subprocess.run", return_value=mock_success) as mock_run:
+                # Call push_commited_changes without branch name
+                success, error = git_repo.push_commited_changes()
+
+                # Verify subprocess.run was called with correct arguments
+                mock_run.assert_called_once()
+                args = mock_run.call_args[0][0]
+                self.assertEqual(args, ["git", "push", "-u", "origin"])
+                
+                # Verify success status
+                self.assertTrue(success)
+                self.assertIsNone(error)
+
+            # Test 3: Push with error
+            mock_error = unittest.mock.Mock()
+            mock_error.returncode = 1
+            mock_error.stderr = "error: failed to push some refs\n"
+
+            with patch("subprocess.run", return_value=mock_error) as mock_run:
+                # Call push_commited_changes
+                success, error = git_repo.push_commited_changes("feature-branch")
+
+                # Verify subprocess.run was called
+                mock_run.assert_called_once()
+                
+                # Verify error status and message
+                self.assertFalse(success)
+                self.assertEqual(error, "error: failed to push some refs")
+
+            # Test 4: Exception handling
+            with patch("subprocess.run", side_effect=Exception("Network error")) as mock_run:
+                # Call push_commited_changes
+                success, error = git_repo.push_commited_changes("feature-branch")
+
+                # Verify subprocess.run was called
+                mock_run.assert_called_once()
+                
+                # Verify error status and message
+                self.assertFalse(success)
+                self.assertEqual(error, "Network error")
+
     def test_raise_pr_error_handling(self):
         """Test that raise_pr handles errors from GitHub CLI gracefully"""
         with GitTemporaryDirectory():
