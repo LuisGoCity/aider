@@ -492,38 +492,25 @@ class GitRepo:
         except ANY_GIT_ERROR as e:
             raise e
 
-    def get_current_branch_name(self):
-        """
-        Get the name of the current git branch.
-        
-        Returns:
-            str: The name of the current branch or None if in detached HEAD state
-        """
-        try:
-            if self.repo.head.is_detached:
-                return None
-            return self.repo.active_branch.name
-        except ANY_GIT_ERROR:
-            # Handle various git errors or detached HEAD state
-            return None
-
     def push_commited_changes(self, branch_name=None):
         """
         Push committed changes to the remote repository.
-        
+
         Args:
             branch_name (str, optional): The name of the branch to push. If None,
                                         attempts to detect the current branch.
-        
+
         Returns:
             tuple: (success, error_message) where success is a boolean indicating if
                   the push was successful, and error_message is a string with details
                   if the push failed (None if successful).
         """
         if not branch_name:
-            branch_name = self.get_current_branch_name()
-            
+            self.io.tool_output("no branch_name")
+            branch_name = self.repo.active_branch.name
+
         if branch_name:
+            self.io.tool_output(f"{branch_name=} of type {type(branch_name)}")
             cmd = ["git", "push", "origin", "-u", branch_name]
         else:
             # Fallback to original behavior if branch name cannot be determined
@@ -531,24 +518,34 @@ class GitRepo:
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            
+
             if result.returncode != 0:
                 error_msg = result.stderr.strip()
                 if "Authentication failed" in error_msg:
                     self.io.tool_error("Git authentication failed. Please check your credentials.")
                     return False, "Git authentication failed. Please check your credentials."
                 elif "could not read Username" in error_msg:
-                    self.io.tool_error("Git credentials not found. Please configure your git credentials.")
-                    return False, "Git credentials not found. Please configure your git credentials."
+                    self.io.tool_error(
+                        "Git credentials not found. Please configure your git credentials."
+                    )
+                    return (
+                        False,
+                        "Git credentials not found. Please configure your git credentials.",
+                    )
                 elif "Connection timed out" in error_msg or "Could not resolve host" in error_msg:
-                    self.io.tool_error("Network error while pushing to remote. Please check your connection.")
-                    return False, "Network error while pushing to remote. Please check your connection."
+                    self.io.tool_error(
+                        "Network error while pushing to remote. Please check your connection."
+                    )
+                    return (
+                        False,
+                        "Network error while pushing to remote. Please check your connection.",
+                    )
                 else:
                     self.io.tool_error(f"Git push failed: {error_msg}")
                     return False, f"Git push failed: {error_msg}"
-            
+
             return True, None
-            
+
         except subprocess.SubprocessError as e:
             self.io.tool_error(f"Error executing git push command: {str(e)}")
             return False, f"Error executing git push command: {str(e)}"
@@ -565,11 +562,12 @@ class GitRepo:
 
         if gh_available:
             # Push changes to remote with the specific branch name
+            self.io("pushing committed changes")
             success, error_message = self.push_commited_changes(branch_name=compare_branch)
             if not success:
                 self.io.tool_error(f"Failed to push changes before creating PR: {error_message}")
                 return False
-                
+            self.io.tool_output(f"{compare_branch=} of type {type(compare_branch)}")
             cmd = [
                 "gh",
                 "pr",
