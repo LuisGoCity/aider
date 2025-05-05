@@ -2836,3 +2836,143 @@ class TestCommands(TestCase):
         ):
             commands.cmd_raise_pr()
             mock_tool_error.assert_called()
+            
+    def test_cmd_solve_jira_commits_implementation_plan(self):
+        """Test that cmd_solve_jira commits the implementation plan file as the first commit"""
+        with GitTemporaryDirectory() as repo_dir:
+            # Setup
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock Jira class and methods
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                
+                # Mock file operations and other methods
+                with (
+                    mock.patch("json.dumps", return_value="{}"),
+                    mock.patch.object(io, "write_text"),
+                    mock.patch.object(commands, "cmd_plan_implementation"),
+                    mock.patch.object(commands, "_clear_chat_history"),
+                    mock.patch.object(commands, "_drop_all_files"),
+                    mock.patch.object(commands, "cmd_code_from_plan"),
+                    mock.patch("os.path.exists", return_value=True),
+                    mock.patch("os.path.splitext", return_value=["jira_issue_TEST-123", "_implementation_plan.md"]),
+                ):
+                    # Mock the _commit_file method to verify it's called correctly
+                    with mock.patch.object(commands, "_commit_file") as mock_commit_file:
+                        # Execute the command
+                        commands.cmd_solve_jira("TEST-123")
+                        
+                        # Verify that _commit_file was called with the implementation plan file
+                        mock_commit_file.assert_any_call(
+                            "jira_issue_TEST-123_implementation_plan.md",
+                            "Add implementation plan for TEST-123"
+                        )
+
+    def test_cmd_solve_jira_deletes_files(self):
+        """Test that cmd_solve_jira deletes the implementation plan and JIRA ticket files"""
+        with GitTemporaryDirectory() as repo_dir:
+            # Setup
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock Jira class and methods
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                
+                # Mock file operations and other methods
+                with (
+                    mock.patch("json.dumps", return_value="{}"),
+                    mock.patch.object(io, "write_text"),
+                    mock.patch.object(commands, "cmd_plan_implementation"),
+                    mock.patch.object(commands, "_clear_chat_history"),
+                    mock.patch.object(commands, "_drop_all_files"),
+                    mock.patch.object(commands, "cmd_code_from_plan"),
+                    mock.patch("os.path.exists", return_value=True),
+                    mock.patch("os.path.splitext", return_value=["jira_issue_TEST-123", "_implementation_plan.md"]),
+                    mock.patch.object(commands, "_commit_file"),
+                ):
+                    # Mock the _delete_and_commit_file method to verify it's called correctly
+                    with mock.patch.object(commands, "_delete_and_commit_file") as mock_delete_file:
+                        # Execute the command
+                        commands.cmd_solve_jira("TEST-123")
+                        
+                        # Verify that _delete_and_commit_file was called for both files
+                        mock_delete_file.assert_any_call(
+                            "jira_issue_TEST-123_implementation_plan.md",
+                            "Remove implementation plan file for TEST-123"
+                        )
+                        mock_delete_file.assert_any_call(
+                            "jira_issue_TEST-123.txt",
+                            "Remove JIRA ticket file for TEST-123"
+                        )
+
+    def test_cmd_solve_jira_with_pr_flag(self):
+        """Test that cmd_solve_jira correctly handles the --with-pr flag"""
+        with GitTemporaryDirectory() as repo_dir:
+            # Setup
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock Jira class and methods
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                
+                # Mock file operations and other methods
+                with (
+                    mock.patch("json.dumps", return_value="{}"),
+                    mock.patch.object(io, "write_text"),
+                    mock.patch.object(commands, "cmd_plan_implementation"),
+                    mock.patch.object(commands, "_clear_chat_history"),
+                    mock.patch.object(commands, "_drop_all_files"),
+                    mock.patch.object(commands, "cmd_code_from_plan"),
+                    mock.patch("os.path.exists", return_value=True),
+                    mock.patch("os.path.splitext", return_value=["jira_issue_TEST-123", "_implementation_plan.md"]),
+                    mock.patch.object(commands, "_commit_file"),
+                    mock.patch.object(commands, "_delete_and_commit_file"),
+                ):
+                    # Mock the cmd_raise_pr method to verify it's called
+                    with mock.patch.object(commands, "cmd_raise_pr") as mock_raise_pr:
+                        # Execute the command with the --with-pr flag
+                        commands.cmd_solve_jira("TEST-123 --with-pr")
+                        
+                        # Verify that cmd_raise_pr was called
+                        mock_raise_pr.assert_called_once()
+
+    def test_cmd_solve_jira_error_handling(self):
+        """Test error handling in cmd_solve_jira"""
+        with GitTemporaryDirectory() as repo_dir:
+            # Setup
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Test case 1: No issue key provided
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                commands.cmd_solve_jira("")
+                mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
+            
+            # Test case 2: Error when implementation plan file doesn't exist
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                
+                with (
+                    mock.patch("json.dumps", return_value="{}"),
+                    mock.patch.object(io, "write_text"),
+                    mock.patch.object(commands, "cmd_plan_implementation"),
+                    mock.patch("os.path.splitext", return_value=["jira_issue_TEST-123", "_implementation_plan.md"]),
+                    mock.patch("os.path.exists", return_value=False),
+                    mock.patch.object(io, "tool_warning") as mock_tool_warning,
+                ):
+                    # Mock _commit_file to simulate the file not existing
+                    with mock.patch.object(commands, "_commit_file", return_value=False):
+                        commands.cmd_solve_jira("TEST-123")
+                        # The function should continue execution even if the file doesn't exist
