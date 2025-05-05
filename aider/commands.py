@@ -1715,6 +1715,28 @@ class Commands:
 
         self.cmd_code_from_plan(implementation_plan, switch_coder=False)
 
+        # Delete the implementation plan file before raising PR
+        if self.coder.repo and os.path.exists(implementation_plan):
+            try:
+                # Remove the file from the file system
+                os.remove(implementation_plan)
+                self.io.tool_output(f"Deleted implementation plan file: {implementation_plan}")
+                
+                # Add the deletion to git staging
+                self.coder.repo.repo.git.add(implementation_plan)
+                
+                # Create a commit for the deletion
+                self.coder.repo.commit(
+                    fnames=[implementation_plan],
+                    message=f"Remove implementation plan for JIRA issue {issue_key_or_id}",
+                    aider_edits=True
+                )
+                self.io.tool_output(f"Committed deletion of implementation plan for JIRA issue {issue_key_or_id}")
+            except OSError as err:
+                self.io.tool_error(f"Unable to delete implementation plan file: {err}")
+            except ANY_GIT_ERROR as err:
+                self.io.tool_error(f"Unable to commit deletion of implementation plan: {err}")
+
         if with_pr:
             self.cmd_raise_pr()
 
