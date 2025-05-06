@@ -1,6 +1,7 @@
 import codecs
 import os
 import re
+import requests
 import shutil
 import sys
 import tempfile
