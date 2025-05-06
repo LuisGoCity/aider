@@ -1730,21 +1730,11 @@ class Commands:
                 self.io.tool_error(f"Unable to commit deletion of implementation plan: {err}")
 
         # Delete the JIRA ticket file before raising PR
-        if self.coder.repo and os.path.exists(path_to_ticket):
-            try:
-                # Remove the file from the file system
-                os.remove(path_to_ticket)
-
-                # Create a commit for the deletion
-                self.coder.repo.commit(
-                    fnames=[path_to_ticket],
-                    message=f"Remove JIRA ticket file for issue {issue_key_or_id}",
-                    aider_edits=True,
-                )
-            except OSError as err:
-                self.io.tool_error(f"Unable to delete JIRA ticket file: {err}")
-            except ANY_GIT_ERROR as err:
-                self.io.tool_error(f"Unable to commit deletion of JIRA ticket file: {err}")
+        try:
+            # Remove the file from the file system
+            os.remove(path_to_ticket)
+        except OSError as err:
+            self.io.tool_error(f"Unable to delete JIRA ticket file: {err}")
 
         if with_pr:
             # Proceed with PR creation
