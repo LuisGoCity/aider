@@ -925,3 +925,45 @@ class TestRepo(unittest.TestCase):
 
                     # Verify the method returned False for failure
                     self.assertFalse(result)
+                    
+    def test_find_pr_template_root_directory(self):
+        """Test that find_pr_template correctly identifies PR templates in the root directory"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a PR template file in the root directory
+            template_path = Path("pull_request_template.md")
+            template_content = "## Description\n\nPlease include a summary of the change"
+            template_path.write_text(template_content)
+            
+            # Add the template to git
+            raw_repo.git.add(str(template_path))
+            raw_repo.git.commit("-m", "Add PR template")
+
+            # Create GitRepo instance
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+            
+            # Call find_pr_template method
+            result = git_repo.find_pr_template()
+            
+            # Verify the method found the template
+            self.assertIsNotNone(result)
+            self.assertEqual(result, str(template_path))
+            
+            # Test with uppercase filename
+            template_path.unlink()  # Remove the existing template
+            uppercase_template_path = Path("PULL_REQUEST_TEMPLATE.md")
+            uppercase_template_path.write_text(template_content)
+            raw_repo.git.add(str(uppercase_template_path))
+            raw_repo.git.commit("-m", "Add uppercase PR template")
+            
+            # Call find_pr_template method again
+            result = git_repo.find_pr_template()
+            
+            # Verify the method found the uppercase template
+            self.assertIsNotNone(result)
+            self.assertEqual(result, str(uppercase_template_path))
