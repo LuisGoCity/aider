@@ -1779,6 +1779,11 @@ class Commands:
         except OSError as err:
             self.io.tool_error(f"Unable to delete JIRA ticket file: {err}")
 
+        # Optionally clean up code with low intensity
+        if with_code_cleanup:
+            self.io.tool_output("Cleaning up code with low intensity...")
+            self.cmd_clean_code("low")
+
         if with_pr:
             # Proceed with PR creation
             self.io.tool_output("Creating pull request with all committed changes...")
