@@ -23,9 +23,13 @@ class PlanPrompts(CoderPrompts):
         " measures.\n\nWarning: Ensure that all JIRA ticket details are accurately interpreted"
         " before generating the plan.\n Do not generalize steps—specificity is crucial.\n When"
         " referencing implementation details, verify against the repo-map to maintain alignment"
-        " with current code structure and standards.\n Additionally, the Warning section should"
-        " cover both common pitfalls and any critical or edge case scenarios specific to the"
-        " feature as implemented in the repository."
+        " with current code structure and standards.\n Do not add steps that are not required to"
+        " implement the ticketi.e steps about unrelated modficiations to the existing codebase.\n"
+        " Any steps revolving around tests should only consider one test i.e. if a step is about"
+        " multiple tests, it should be broken down into as many steps.\nAvoid adding unncesseary"
+        " steps about refactoring and error handling if not included in the ticket.\nAdditionally,"
+        " the Warning section should cover both common pitfalls and any critical or edge case"
+        " scenarios specific to the feature as implemented in the repository."
     )
 
     system_reminder = (
@@ -34,11 +38,11 @@ class PlanPrompts(CoderPrompts):
         " required in the feature specification."
     )
     system_reminder += (
-        "Any steps revolving around tests should only consider one step i.e. if a step is about "
+        "Any steps revolving around tests should only consider one test i.e. if a step is about "
         "multiple tests, it should be broken down into as many steps."
     )
 
     system_reminder += (
-        "Avoid adding unncesseary steps about refactoring and error handling if nnot included in"
+        "Avoid adding unncesseary steps about refactoring and error handling if not included in"
         " the ticket"
     )
