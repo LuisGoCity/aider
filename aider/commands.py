@@ -54,6 +54,10 @@ class Commands:
             self.commands.io.confirm_ask = self.original_confirm_ask
             # Don't suppress exceptions
             return False
+    
+    def _with_auto_confirm(self):
+        """Returns a context manager that temporarily sets io.confirm_ask to auto_confirm_ask."""
+        return self._AutoConfirmContext(self)
 
     def clone(self):
         return Commands(
