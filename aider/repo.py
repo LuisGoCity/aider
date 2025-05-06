@@ -602,7 +602,9 @@ class GitRepo:
     
     def select_pr_template(self, templates, base_branch, compare_branch, pr_title, pr_description):
         """
-        Use an LLM call to select the appropriate PR template when multiple templates are found.
+        Simple method to select the first template when multiple templates are found.
+        This is kept for backward compatibility but the actual selection logic
+        has been moved to cmd_raise_pr in the Commands class.
         
         Args:
             templates (list): List of paths to PR templates
@@ -620,78 +622,8 @@ class GitRepo:
         if len(templates) == 1:
             return templates[0]
             
-        # Read the content of each template
-        template_contents = {}
-        for template_path in templates:
-            try:
-                with open(template_path, 'r', encoding='utf-8') as f:
-                    template_contents[template_path] = f.read()
-            except Exception as e:
-                self.io.tool_warning(f"Failed to read template {template_path}: {e}")
-                
-        if not template_contents:
-            return None
-            
-        # Get commit history and changed files for context
-        try:
-            commit_history = self.get_commit_history(base_branch, compare_branch)
-            changed_files = self.get_changed_files(base_branch, compare_branch)
-        except Exception as e:
-            commit_history = "Could not retrieve commit history"
-            changed_files = []
-            self.io.tool_warning(f"Failed to get commit history or changed files: {e}")
-            
-        # Prepare the prompt for the LLM
-        prompt = f"""
-I need to select the most appropriate PR template for a pull request with the following details:
-
-PR Title: {pr_title}
-PR Description: {pr_description}
-
-Base Branch: {base_branch}
-Compare Branch: {compare_branch}
-
-Commit History:
-{commit_history}
-
-Changed Files:
-{', '.join(changed_files) if changed_files else 'No files changed'}
-
-Available PR Templates:
-"""
-        
-        # Add template contents to the prompt
-        for i, (path, content) in enumerate(template_contents.items(), 1):
-            template_name = os.path.basename(path)
-            prompt += f"\n--- Template {i}: {template_name} ---\n{content}\n"
-            
-        prompt += "\nBased on the PR details and the available templates, which template (by number) is the most appropriate to use? Respond with just the template number."
-        
-        # Make the LLM call
-        messages = [
-            {"role": "system", "content": "You are an expert software engineer helping to select the most appropriate PR template based on the PR details and available templates."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        try:
-            for model in self.models:
-                response = model.simple_send_with_retries(messages)
-                if response:
-                    # Extract the template number from the response
-                    import re
-                    match = re.search(r'(\d+)', response)
-                    if match:
-                        template_num = int(match.group(1))
-                        if 1 <= template_num <= len(templates):
-                            self.io.tool_output(f"Selected PR template: {os.path.basename(templates[template_num-1])}")
-                            return templates[template_num-1]
-                    
-                    self.io.tool_warning(f"Could not parse template selection from LLM response: {response}")
-        except Exception as e:
-            self.io.tool_error(f"Error selecting PR template: {e}")
-            
-        # If we couldn't select a template, use the first one as a fallback
-        self.io.tool_warning("Could not select a specific PR template, using the first one as fallback")
+        # Just return the first template as a fallback
+        self.io.tool_warning("Multiple PR templates found, using the first one as fallback")
         return templates[0]
             
     def raise_pr(self, base_branch, compare_branch, pr_title, pr_description):
@@ -705,35 +637,6 @@ Available PR Templates:
             pass
 
         if gh_available:
-            # Look for PR templates
-            template_path = None
-            templates = self.find_pr_template()
-            
-            if templates:
-                if isinstance(templates, list):
-                    # Multiple templates found, use LLM to select the appropriate one
-                    template_path = self.select_pr_template(
-                        templates, base_branch, compare_branch, pr_title, pr_description
-                    )
-                else:
-                    # Single template found
-                    template_path = templates
-                    
-            # If a template was found, read its content and append the PR description
-            if template_path:
-                try:
-                    with open(template_path, 'r', encoding='utf-8') as f:
-                        template_content = f.read()
-                        
-                    # Combine the PR description with the template
-                    # Add the original description at the top, followed by the template
-                    combined_description = f"{pr_description}\n\n{template_content}"
-                    
-                    # Update the PR description
-                    pr_description = combined_description
-                    self.io.tool_output(f"Using PR template: {os.path.basename(template_path)}")
-                except Exception as e:
-                    self.io.tool_warning(f"Failed to read PR template {template_path}: {e}")
             
             # Push changes to remote with the specific branch name
             success, error_message = self.push_commited_changes(branch_name=compare_branch.name)

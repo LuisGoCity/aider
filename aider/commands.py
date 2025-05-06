@@ -399,9 +399,89 @@ class Commands:
 
         pr_title = context_coder.run(title_prompt).strip()
 
-        # Pass the models to the repo for potential LLM calls during PR template selection
-        self.coder.repo.models = self.coder.models
+        # Look for PR templates
+        templates = self.coder.repo.find_pr_template()
+        template_path = None
+        
+        if templates:
+            if isinstance(templates, list) and len(templates) > 1:
+                # Multiple templates found, select the appropriate one based on commit history and changed files
+                self.io.tool_output(f"Found {len(templates)} PR templates, selecting the most appropriate one...")
+                
+                # Read the content of each template
+                template_contents = {}
+                for template_path in templates:
+                    try:
+                        with open(template_path, 'r', encoding='utf-8') as f:
+                            template_contents[template_path] = f.read()
+                    except Exception as e:
+                        self.io.tool_warning(f"Failed to read template {template_path}: {e}")
+                
+                if template_contents:
+                    # Analyze commit history and changed files to determine the best template
+                    template_scores = {}
+                    
+                    # Simple heuristics for template selection
+                    for path, content in template_contents.items():
+                        score = 0
+                        template_name = os.path.basename(path).lower()
+                        
+                        # Check if any changed files match template keywords
+                        for file in changed_files:
+                            file_lower = file.lower()
+                            # Score based on file types
+                            if 'test' in file_lower and 'test' in template_name:
+                                score += 2
+                            if 'doc' in file_lower and 'documentation' in template_name:
+                                score += 2
+                            if 'fix' in commit_history.lower() and ('bug' in template_name or 'fix' in template_name):
+                                score += 3
+                            if 'feat' in commit_history.lower() and 'feature' in template_name:
+                                score += 3
+                            
+                        # Check template content for relevant sections
+                        content_lower = content.lower()
+                        if 'bug' in pr_title.lower() and 'bug' in content_lower:
+                            score += 2
+                        if 'feature' in pr_title.lower() and 'feature' in content_lower:
+                            score += 2
+                        if 'documentation' in pr_title.lower() and 'documentation' in content_lower:
+                            score += 2
+                            
+                        template_scores[path] = score
+                    
+                    # Select the template with the highest score
+                    if template_scores:
+                        best_template = max(template_scores.items(), key=lambda x: x[1])[0]
+                        template_path = best_template
+                        self.io.tool_output(f"Selected PR template: {os.path.basename(template_path)}")
+                    else:
+                        template_path = templates[0]
+                        self.io.tool_output(f"Using default PR template: {os.path.basename(template_path)}")
+                else:
+                    template_path = templates[0]
+            else:
+                # Single template found
+                template_path = templates[0] if isinstance(templates, list) else templates
+                self.io.tool_output(f"Using PR template: {os.path.basename(template_path)}")
+        
+        # Pass the template path to raise_pr
         self.coder.repo.io = self.io
+        
+        # If a template was found, read its content and append the PR description
+        if template_path:
+            try:
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    template_content = f.read()
+                    
+                # Combine the PR description with the template
+                # Add the original description at the top, followed by the template
+                combined_description = f"{pr_description}\n\n{template_content}"
+                
+                # Update the PR description
+                pr_description = combined_description
+            except Exception as e:
+                self.io.tool_warning(f"Failed to read PR template {template_path}: {e}")
         
         self.coder.repo.raise_pr(default_branch, current_branch, pr_title, pr_description)
 
