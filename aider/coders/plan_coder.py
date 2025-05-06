@@ -30,7 +30,11 @@ class PlanCoder(Coder):
         return final_plan
 
     def generate_initial_plan(self, ticket_content):
-        message = f"Please create an implementation plan for this JIRA ticket:\n\n{ticket_content}"
+        message = (
+            f"Please create an implementation plan for this JIRA ticket:\n\n{ticket_content}. If no"
+            " plan is needed because the requested feature already exists or is not related to"
+            " anything in this repo, return a plan syaing that no changes are needed."
+        )
         self.run_one(message, preproc=False)
         return self.partial_response_content
 
