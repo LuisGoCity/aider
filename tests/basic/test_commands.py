@@ -3462,6 +3462,7 @@ class TestCommands(TestCase):
                     return_value=[str(feature_template), str(bugfix_template)],
                 ) as mock_find_template,
                 mock.patch.object(coder.repo, "raise_pr") as mock_raise_pr,
+                mock.patch.object(io, "read_text", return_value="Template content"),
             ):
                 # Create mock context coder
                 mock_context_coder = mock.MagicMock()
