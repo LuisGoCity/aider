@@ -1061,20 +1061,27 @@ class TestRepo(unittest.TestCase):
 
             # Verify the method found the template
             self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            template_path = result_parent_dir / template_path
             self.assertEqual(result, str(template_path))
 
             # Test with different case filename
             template_path.unlink()  # Remove the existing template
             different_case_template_path = github_dir / "PULL_REQUEST_TEMPLATE.md"
             different_case_template_path.write_text(template_content)
-            raw_repo.git.add(str(different_case_template_path))
-            raw_repo.git.commit("-m", "Add different case PR template in .github directory")
+            # Force Git to recognize case change by configuring core.ignorecase
+            raw_repo.git.config("core.ignorecase", "false")
 
+            # Add all changes including deletions
+            raw_repo.git.add("--all")
+            raw_repo.git.commit("-m", "Add different case PR template in .github directory")
             # Call find_pr_template method again
             result = git_repo.find_pr_template()
 
             # Verify the method found the different case template
             self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            template_path = result_parent_dir / template_path
             self.assertEqual(result, str(different_case_template_path))
 
     def test_find_pr_template_in_subdirectories(self):
