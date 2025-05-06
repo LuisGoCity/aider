@@ -370,42 +370,39 @@ class Commands:
 
         # Look for PR templates first
         templates = self.coder.repo.find_pr_template()
-        template_path = None
-        template_content = None
+        selected_template = None
+        # Instantiate context coder
+        from aider.coders.base_coder import Coder
 
+        ask_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format="ask",
+            summarize_from_coder=False,
+        )
         if templates:
             if isinstance(templates, list) and len(templates) > 1:
                 # Multiple templates found, select the appropriate
-                self.io.tool_output(
-                    f"Found {len(templates)} PR templates, selecting the most appropriate one..."
-                )
 
                 # Read the content of each template
                 template_contents = {path: self.io.read_text(path) for path in templates}
 
                 if template_contents:
                     # Analyze commit history and changed files to determine the best template
-                    pass
-
+                    selection_prompt = (
+                        f"Based on this commit history: {commit_history} over these files"
+                        f" {changed_files},which of these PR templates should be used to raise a PR"
+                        " in this repo. Return only one, the name(key of json object) of the most"
+                        f" appropriate fit. Here are the options {json.dumps(templates, indent=4)}"
+                    )
+                    selected_template_name = ask_coder.run(selection_prompt)
+                    selected_template = template_contents.get(selected_template_name)
+                    if not selected_template:
+                        selected_template = template_contents[next(iter(template_contents))]
             else:
                 # Single template found
                 template_path = templates[0] if isinstance(templates, list) else templates
-                try:
-                    with open(template_path, "r", encoding="utf-8") as f:
-                        template_content = f.read()
-                    self.io.tool_output(f"Using PR template: {os.path.basename(template_path)}")
-                except Exception as e:
-                    self.io.tool_warning(f"Failed to read PR template {template_path}: {e}")
-
-        # Instantiate context coder
-        from aider.coders.base_coder import Coder
-
-        context_coder = Coder.create(
-            io=self.io,
-            from_coder=self.coder,
-            edit_format="ask",
-            summarize_from_coder=False,
-        )
+                selected_template = self.io.read_text(template_path)
 
         # Add prompt for description, including template if found
         description_prompt = (
@@ -417,27 +414,22 @@ class Commands:
         )
 
         # If a template was found, include it in the prompt
-        if template_content:
+        if selected_template:
             description_prompt += (
                 "\nPlease format your response according to the following PR template"
-                f" structure:\n\n{template_content}\n\nFill in all relevant sections of the"
+                f" structure:\n\n{selected_template}\n\nFill in all relevant sections of the"
                 " template with appropriate content based on the changes."
-            )
-        else:
-            description_prompt += (
-                "\nFormat your response as a markdown description suitable for a pull request."
-                " Exclude any explanations around commits, plan.md files or similar."
             )
 
         # Run description and store output in variable
-        pr_description = context_coder.run(description_prompt)
+        pr_description = ask_coder.run(description_prompt)
 
         title_prompt = (
             "Based on this PR description, generate a concise, descriptive title (one line):\n"
             f"{pr_description}\n Return only the title text, nothing else."
         )
 
-        pr_title = context_coder.run(title_prompt).strip()
+        pr_title = ask_coder.run(title_prompt).strip()
 
         # Pass the IO object to the repo for output messages
         self.coder.repo.io = self.io
