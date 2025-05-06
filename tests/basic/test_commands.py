@@ -2846,7 +2846,7 @@ class TestCommands(TestCase):
             
             # Mock the Jira class and its methods
             with (
-                mock.patch("aider.commands.Jira") as mock_jira_class,
+                mock.patch("aider.jira.Jira") as mock_jira_class,
                 mock.patch.object(io, "write_text") as mock_write_text,
                 mock.patch.object(commands, "cmd_plan_implementation") as mock_plan_implementation,
                 mock.patch.object(commands, "_clear_chat_history") as mock_clear_history,
