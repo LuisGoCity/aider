@@ -3127,3 +3127,66 @@ class TestCommands(TestCase):
                 mock_write_text.assert_called_once()
                 mock_remove.assert_any_call("jira_issue_TEST-123.txt")
                 mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
+                
+    def test_cmd_solve_jira_git_commits(self):
+        """Test that appropriate git commits are made"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock the Jira class and its methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(io, "write_text") as mock_write_text,
+                mock.patch.object(commands, "cmd_plan_implementation") as mock_plan_implementation,
+                mock.patch.object(commands, "cmd_code_from_plan") as mock_code_from_plan,
+                mock.patch("os.path.exists", return_value=True),
+                mock.patch("os.remove") as mock_remove,
+                mock.patch.object(commands, "_clear_chat_history"),
+                mock.patch.object(commands, "_drop_all_files"),
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description with requirements",
+                    "comments": [
+                        {
+                            "author": "Test User",
+                            "last_updated": "2023-01-01T12:00:00",
+                            "comment": "Test comment"
+                        }
+                    ]
+                }
+                
+                # Create a mock repo
+                mock_repo = mock.MagicMock()
+                coder.repo = mock_repo
+                
+                # Execute the command
+                commands.cmd_solve_jira("TEST-123")
+                
+                # Verify that commits were made for the implementation plan
+                mock_repo.commit.assert_any_call(
+                    fnames=["jira_issue_TEST-123_implementation_plan.md"],
+                    message="Add implementation plan for JIRA issue TEST-123",
+                    aider_edits=True
+                )
+                
+                # Verify that commits were made for deleting the implementation plan
+                mock_repo.commit.assert_any_call(
+                    fnames=["jira_issue_TEST-123_implementation_plan.md"],
+                    message="Delete implementation plan for JIRA issue TEST-123 from git",
+                    aider_edits=True
+                )
+                
+                # Verify that commits were made for deleting the JIRA ticket file
+                mock_repo.commit.assert_any_call(
+                    fnames=["jira_issue_TEST-123.txt"],
+                    message="Remove JIRA ticket file for issue TEST-123",
+                    aider_edits=True
+                )
+                
+                # Verify the total number of commits made
+                self.assertEqual(mock_repo.commit.call_count, 3)
