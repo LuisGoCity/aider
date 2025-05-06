@@ -1889,24 +1889,22 @@ class Commands:
             " the number of steps."
         )
 
-        # change confirm_ask function to automatically say yes/no to specific commands.
-        original_confirm_ask = self.io.confirm_ask
-        self.io.confirm_ask = self.io.auto_confirm_ask
-
-        # Extract the number from the response
-        try:
-            step_count = int(response)
-            self.io.tool_output(f"Found {step_count} steps in the plan.")
-        except ValueError:
-            self.io.tool_output(
-                "Unable to determine number of steps. Will try to solve them all at once."
-            )
-            prompt = (
-                f"Please, implement the plan in the {Path(plan_path).name} file step by step. Add"
-                " any files, you require to implement this plan, to this chat."
-            )
-            self._run_new_coder(prompt, [Path(plan_path).name], False)
-            self._from_plan_exist_strategy(original_confirm_ask)
+        # Use the context manager to automatically confirm prompts
+        with self._with_auto_confirm():
+            # Extract the number from the response
+            try:
+                step_count = int(response)
+                self.io.tool_output(f"Found {step_count} steps in the plan.")
+            except ValueError:
+                self.io.tool_output(
+                    "Unable to determine number of steps. Will try to solve them all at once."
+                )
+                prompt = (
+                    f"Please, implement the plan in the {Path(plan_path).name} file step by step. Add"
+                    " any files, you require to implement this plan, to this chat."
+                )
+                self._run_new_coder(prompt, [Path(plan_path).name], False)
+                self._from_plan_exist_strategy()
 
         try:
             for i in range(1, step_count + 1):
@@ -1921,7 +1919,7 @@ class Commands:
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
 
         if switch_coder:
-            self._from_plan_exist_strategy(original_confirm_ask)
+            self._from_plan_exist_strategy()
 
     def _get_language_from_extension(self, extension):
         """Helper method to get language name from file extension"""
