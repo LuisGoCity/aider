@@ -3190,3 +3190,76 @@ class TestCommands(TestCase):
                 
                 # Verify the total number of commits made
                 self.assertEqual(mock_repo.commit.call_count, 3)
+                
+    def test_cmd_solve_jira_command_flow(self):
+        """Test that all required commands are called in the correct order"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create a mock manager to track the order of method calls
+            mock_manager = mock.MagicMock()
+            
+            # Mock the Jira class and its methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(io, "write_text") as mock_write_text,
+                mock.patch.object(commands, "cmd_plan_implementation") as mock_plan_implementation,
+                mock.patch.object(commands, "_clear_chat_history") as mock_clear_history,
+                mock.patch.object(commands, "_drop_all_files") as mock_drop_files,
+                mock.patch.object(commands, "cmd_code_from_plan") as mock_code_from_plan,
+                mock.patch("os.path.exists", return_value=True),
+                mock.patch("os.remove") as mock_remove,
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description with requirements",
+                    "comments": [
+                        {
+                            "author": "Test User",
+                            "last_updated": "2023-01-01T12:00:00",
+                            "comment": "Test comment"
+                        }
+                    ]
+                }
+                
+                # Set up side effects to track call order
+                mock_write_text.side_effect = lambda **kwargs: mock_manager.write_text(**kwargs)
+                mock_plan_implementation.side_effect = lambda *args: mock_manager.plan_implementation(*args)
+                mock_clear_history.side_effect = lambda: mock_manager.clear_history()
+                mock_drop_files.side_effect = lambda: mock_manager.drop_files()
+                mock_code_from_plan.side_effect = lambda *args, **kwargs: mock_manager.code_from_plan(*args, **kwargs)
+                
+                # Execute the command
+                commands.cmd_solve_jira("TEST-123")
+                
+                # Verify the correct sequence of method calls
+                mock_calls = mock_manager.mock_calls
+                call_names = [call[0] for call in mock_calls]
+                
+                # Check that write_text is called first (to create the ticket file)
+                self.assertEqual(call_names[0], 'write_text')
+                
+                # Check that plan_implementation is called next
+                self.assertEqual(call_names[1], 'plan_implementation')
+                self.assertEqual(mock_plan_implementation.call_args[0][0], "jira_issue_TEST-123.txt")
+                
+                # Check that clear_history and drop_files are called before code_from_plan
+                self.assertIn('clear_history', call_names)
+                self.assertIn('drop_files', call_names)
+                clear_index = call_names.index('clear_history')
+                drop_index = call_names.index('drop_files')
+                code_index = call_names.index('code_from_plan')
+                
+                # Verify the order: clear_history -> drop_files -> code_from_plan
+                self.assertLess(clear_index, code_index)
+                self.assertLess(drop_index, code_index)
+                
+                # Check that code_from_plan is called with the correct implementation plan file
+                self.assertEqual(
+                    mock_code_from_plan.call_args[0][0],
+                    "jira_issue_TEST-123_implementation_plan.md"
+                )
