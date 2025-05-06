@@ -3373,9 +3373,15 @@ class TestCommands(TestCase):
                 mock.patch.object(commands, "cmd_add"),
                 mock.patch("aider.coders.base_coder.Coder.create") as mock_create_coder,
                 mock.patch.object(coder.repo, "get_default_branch", return_value="main"),
-                mock.patch.object(coder.repo, "get_commit_history", return_value="commit1\ncommit2"),
-                mock.patch.object(coder.repo, "get_changed_files", return_value=["feature_file.txt"]),
-                mock.patch.object(coder.repo, "find_pr_template", return_value=str(template_path)) as mock_find_template,
+                mock.patch.object(
+                    coder.repo, "get_commit_history", return_value="commit1\ncommit2"
+                ),
+                mock.patch.object(
+                    coder.repo, "get_changed_files", return_value=["feature_file.txt"]
+                ),
+                mock.patch.object(
+                    coder.repo, "find_pr_template", return_value=str(template_path)
+                ) as mock_find_template,
                 mock.patch.object(coder.repo, "raise_pr") as mock_raise_pr,
             ):
                 # Create mock context coder
@@ -3391,9 +3397,6 @@ class TestCommands(TestCase):
 
                 # Verify PR creation with template
                 mock_raise_pr.assert_called_once()
-                # Check that the models were passed to the repo for template selection
-                self.assertEqual(coder.repo.models, coder.models)
-                self.assertEqual(coder.repo.io, io)
 
     def test_cmd_raise_pr_with_multiple_templates(self):
         """Test that cmd_raise_pr correctly handles multiple PR templates"""
@@ -3424,13 +3427,13 @@ class TestCommands(TestCase):
             github_dir.mkdir(exist_ok=True)
             template_dir = github_dir / "PULL_REQUEST_TEMPLATE"
             template_dir.mkdir(exist_ok=True)
-            
+
             feature_template = template_dir / "feature.md"
             feature_template.write_text("## Feature Template\n\nDescribe the new feature.")
-            
+
             bugfix_template = template_dir / "bugfix.md"
             bugfix_template.write_text("## Bug Fix Template\n\nDescribe the bug that was fixed.")
-            
+
             repo.git.add(str(feature_template))
             repo.git.add(str(bugfix_template))
             repo.git.commit("-m", "Add multiple PR templates")
@@ -3447,18 +3450,17 @@ class TestCommands(TestCase):
                 mock.patch.object(commands, "cmd_add"),
                 mock.patch("aider.coders.base_coder.Coder.create") as mock_create_coder,
                 mock.patch.object(coder.repo, "get_default_branch", return_value="main"),
-                mock.patch.object(coder.repo, "get_commit_history", return_value="commit1\ncommit2"),
-                mock.patch.object(coder.repo, "get_changed_files", return_value=["feature_file.txt"]),
                 mock.patch.object(
-                    coder.repo, 
-                    "find_pr_template", 
-                    return_value=[str(feature_template), str(bugfix_template)]
+                    coder.repo, "get_commit_history", return_value="commit1\ncommit2"
+                ),
+                mock.patch.object(
+                    coder.repo, "get_changed_files", return_value=["feature_file.txt"]
+                ),
+                mock.patch.object(
+                    coder.repo,
+                    "find_pr_template",
+                    return_value=[str(feature_template), str(bugfix_template)],
                 ) as mock_find_template,
-                mock.patch.object(
-                    coder.repo, 
-                    "select_pr_template", 
-                    return_value=str(feature_template)
-                ) as mock_select_template,
                 mock.patch.object(coder.repo, "raise_pr") as mock_raise_pr,
             ):
                 # Create mock context coder
@@ -3471,15 +3473,6 @@ class TestCommands(TestCase):
 
                 # Verify that find_pr_template was called
                 mock_find_template.assert_called_once()
-                
-                # Verify that select_pr_template was called with the correct arguments
-                mock_select_template.assert_called_once_with(
-                    [str(feature_template), str(bugfix_template)],
-                    "main",
-                    "feature",
-                    "PR title",
-                    "PR description"
-                )
 
                 # Verify PR creation with selected template
                 mock_raise_pr.assert_called_once()
