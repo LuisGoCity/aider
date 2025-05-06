@@ -2103,36 +2103,36 @@ Just show me the edits I need to make.
         # Use the context manager to automatically confirm prompts
         with self._with_auto_confirm():
             for file_path in code_files:
-            abs_path = os.path.join(self.coder.root, file_path)
+                abs_path = os.path.join(self.coder.root, file_path)
 
-            # Check if file exists and can be read
-            if not os.path.exists(abs_path):
-                self.io.tool_warning(f"File {file_path} no longer exists, skipping.")
-                continue
+                # Check if file exists and can be read
+                if not os.path.exists(abs_path):
+                    self.io.tool_warning(f"File {file_path} no longer exists, skipping.")
+                    continue
 
-            self.io.tool_output(f"\nCleaning {file_path}...")
+                self.io.tool_output(f"\nCleaning {file_path}...")
 
-            # Create a temporary coder instance for this file
-            try:
-                # Create a prompt for the file cleanup
-                file_extension = os.path.splitext(file_path)[1].lower()
-                language = self._get_language_from_extension(file_extension)
+                # Create a temporary coder instance for this file
+                try:
+                    # Create a prompt for the file cleanup
+                    file_extension = os.path.splitext(file_path)[1].lower()
+                    language = self._get_language_from_extension(file_extension)
 
-                cleanup_prompt = f"I need you to clean up the following {language} code file. "
-                cleanup_prompt += "Focus on these specific tasks:\n"
-                for task in selected_prompts:
-                    cleanup_prompt += f"- {task}\n"
-                cleanup_prompt += (
-                    "\nMake sure to preserve the functionality of the code while improving its"
-                    " quality."
-                )
-                self.cmd_add(file_path)
-                self._run_new_coder(
-                    prompt=cleanup_prompt, summarize_from_coder=True, exclude_from_drop=True
-                )
-            except Exception as e:
-                self.io.tool_error(f"Error processing {file_path}: {str(e)}")
-                continue
+                    cleanup_prompt = f"I need you to clean up the following {language} code file. "
+                    cleanup_prompt += "Focus on these specific tasks:\n"
+                    for task in selected_prompts:
+                        cleanup_prompt += f"- {task}\n"
+                    cleanup_prompt += (
+                        "\nMake sure to preserve the functionality of the code while improving its"
+                        " quality."
+                    )
+                    self.cmd_add(file_path)
+                    self._run_new_coder(
+                        prompt=cleanup_prompt, summarize_from_coder=True, exclude_from_drop=True
+                    )
+                except Exception as e:
+                    self.io.tool_error(f"Error processing {file_path}: {str(e)}")
+                    continue
 
 
 
