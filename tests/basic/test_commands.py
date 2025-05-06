@@ -3327,6 +3327,117 @@ class TestCommands(TestCase):
                     # Verify that tool_error was called when file removal fails
                     self.assertEqual(mock_remove.call_count, 2)
                     mock_tool_error.assert_any_call(mock.ANY)
+                    
+    def test_cmd_solve_jira_with_code_cleanup(self):
+        """Test that cmd_solve_jira correctly triggers code cleanup when --with-code-cleanup flag is provided"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Mock the necessary methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(io, "write_text"),
+                mock.patch.object(commands, "cmd_plan_implementation"),
+                mock.patch.object(commands, "_clear_chat_history"),
+                mock.patch.object(commands, "_drop_all_files"),
+                mock.patch.object(commands, "cmd_code_from_plan"),
+                mock.patch.object(commands, "cmd_clean_code") as mock_clean_code,
+                mock.patch("os.path.exists", return_value=True),
+                mock.patch("os.remove"),
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description",
+                    "comments": [],
+                }
+
+                # Execute the command with --with-code-cleanup flag
+                commands.cmd_solve_jira("TEST-123 --with-code-cleanup")
+
+                # Verify that cmd_clean_code was called with "low" intensity
+                mock_clean_code.assert_called_once_with("low")
+
+                # Reset the mock and test with the short form flag
+                mock_clean_code.reset_mock()
+                commands.cmd_solve_jira("TEST-123 -cleanup")
+
+                # Verify that cmd_clean_code was called with "low" intensity
+                mock_clean_code.assert_called_once_with("low")
+
+                # Reset the mock and test without the flag
+                mock_clean_code.reset_mock()
+                commands.cmd_solve_jira("TEST-123")
+
+                # Verify that cmd_clean_code was not called
+                mock_clean_code.assert_not_called()
+                
+    def test_cmd_solve_jira_with_combined_flags(self):
+        """Test that cmd_solve_jira correctly handles both --with-pr and --with-code-cleanup flags together"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+
+            # Mock the necessary methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(io, "write_text"),
+                mock.patch.object(commands, "cmd_plan_implementation"),
+                mock.patch.object(commands, "_clear_chat_history"),
+                mock.patch.object(commands, "_drop_all_files"),
+                mock.patch.object(commands, "cmd_code_from_plan"),
+                mock.patch.object(commands, "cmd_clean_code") as mock_clean_code,
+                mock.patch.object(commands, "cmd_raise_pr") as mock_raise_pr,
+                mock.patch("os.path.exists", return_value=True),
+                mock.patch("os.remove"),
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description",
+                    "comments": [],
+                }
+
+                # Execute the command with both flags
+                commands.cmd_solve_jira("TEST-123 --with-pr --with-code-cleanup")
+
+                # Verify that both methods were called
+                mock_clean_code.assert_called_once_with("low")
+                mock_raise_pr.assert_called_once()
+                
+                # Reset mocks for the next test
+                mock_clean_code.reset_mock()
+                mock_raise_pr.reset_mock()
+                
+                # Test with short form flags
+                commands.cmd_solve_jira("TEST-123 -pr -cleanup")
+                
+                # Verify that both methods were called
+                mock_clean_code.assert_called_once_with("low")
+                mock_raise_pr.assert_called_once()
+                
+                # Create a mock manager to track call order
+                manager = mock.MagicMock()
+                manager.attach_mock(mock_clean_code, 'clean_code')
+                manager.attach_mock(mock_raise_pr, 'raise_pr')
+                
+                # Reset mocks for the order test
+                mock_clean_code.reset_mock()
+                mock_raise_pr.reset_mock()
+                
+                # Test again to verify order
+                commands.cmd_solve_jira("TEST-123 --with-pr --with-code-cleanup")
+                
+                # Check that clean_code was called before raise_pr
+                call_names = [call[0] for call in manager.method_calls]
+                clean_index = call_names.index('clean_code')
+                pr_index = call_names.index('raise_pr')
+                self.assertLess(clean_index, pr_index, "Code cleanup should be performed before PR creation")
 
     def test_cmd_raise_pr_with_template(self):
         """Test that cmd_raise_pr correctly uses PR templates when available"""
