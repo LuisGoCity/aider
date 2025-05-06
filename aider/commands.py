@@ -1689,7 +1689,7 @@ class Commands:
         self.io.tool_output(announcements)
 
     def cmd_solve_jira(self, args):
-        "Implement feature from jira issue key or id. Optionally raise a pr"
+        "Implement feature from jira issue key or id. Optionally raise a pr or clean up code"
 
         args = args.strip()
         if not args:
