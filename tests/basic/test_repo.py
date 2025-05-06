@@ -960,7 +960,8 @@ class TestRepo(unittest.TestCase):
             template_path.unlink()  # Remove the existing template
             uppercase_template_path = Path("PULL_REQUEST_TEMPLATE.md")
             uppercase_template_path.write_text(template_content)
-            raw_repo.git.add(str(uppercase_template_path))
+            # Make sure Git recognizes the change
+            raw_repo.git.add("--all")  # Add all changes including deletions
             raw_repo.git.commit("-m", "Add uppercase PR template")
 
             # Call find_pr_template method again
