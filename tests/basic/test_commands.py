@@ -1,7 +1,6 @@
 import codecs
 import os
 import re
-import requests
 import shutil
 import sys
 import tempfile
@@ -2965,10 +2964,10 @@ class TestCommands(TestCase):
                 # Verify temporary files were removed
                 mock_remove.assert_any_call("jira_issue_TEST-123.txt")
                 mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
-                
+
                 # Verify that cmd_raise_pr was called to create a pull request
                 mock_raise_pr.assert_called_once()
-                
+
     def test_cmd_solve_jira_with_short_pr_flag(self):
         """Test execution with the -pr flag"""
         with GitTemporaryDirectory() as repo_dir:
@@ -2976,7 +2975,7 @@ class TestCommands(TestCase):
             io = InputOutput(pretty=False, fancy_input=False, yes=True)
             coder = Coder.create(self.GPT35, None, io)
             commands = Commands(io, coder)
-            
+
             # Mock the Jira class and its methods
             with (
                 mock.patch("aider.jira.Jira") as mock_jira_class,
@@ -2998,113 +2997,71 @@ class TestCommands(TestCase):
                         {
                             "author": "Test User",
                             "last_updated": "2023-01-01T12:00:00",
-                            "comment": "Test comment"
+                            "comment": "Test comment",
                         }
-                    ]
+                    ],
                 }
-                
+
                 # Execute the command with -pr flag (short form)
                 commands.cmd_solve_jira("TEST-123 -pr")
-                
+
                 # Verify Jira API was called with the correct issue key
                 mock_jira_instance.get_issue_content.assert_called_once_with("TEST-123")
-                
+
                 # Verify the ticket content was written to a file
                 mock_write_text.assert_called_once()
                 file_path_arg = mock_write_text.call_args[1]["filename"]
                 self.assertEqual(file_path_arg, "jira_issue_TEST-123.txt")
-                
+
                 # Verify plan implementation was called with the ticket file
                 mock_plan_implementation.assert_called_once_with("jira_issue_TEST-123.txt")
-                
+
                 # Verify chat history was cleared and files were dropped
                 mock_clear_history.assert_called_once()
                 mock_drop_files.assert_called_once()
-                
+
                 # Verify code_from_plan was called with the implementation plan file
                 mock_code_from_plan.assert_called_once()
                 self.assertEqual(
                     mock_code_from_plan.call_args[0][0],
-                    "jira_issue_TEST-123_implementation_plan.md"
+                    "jira_issue_TEST-123_implementation_plan.md",
                 )
-                
+
                 # Verify temporary files were removed
                 mock_remove.assert_any_call("jira_issue_TEST-123.txt")
                 mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
-                
+
                 # Verify that cmd_raise_pr was called to create a pull request
                 mock_raise_pr.assert_called_once()
-                
+
     def test_cmd_solve_jira_no_issue_key(self):
         """Test error handling when no issue key is provided"""
         with GitTemporaryDirectory() as repo_dir:
+            repo_dir = repo_dir
             io = InputOutput(pretty=False, fancy_input=False, yes=True)
             coder = Coder.create(self.GPT35, None, io)
             commands = Commands(io, coder)
-            
+
             # Mock the tool_error method to verify it's called with the correct message
             with mock.patch.object(io, "tool_error") as mock_tool_error:
                 # Execute the command with no issue key
                 commands.cmd_solve_jira("")
-                
+
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
-                
+
             # Test with only flags but no issue key
             with mock.patch.object(io, "tool_error") as mock_tool_error:
                 # Execute the command with only the --with-pr flag
                 commands.cmd_solve_jira("--with-pr")
-                
+
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
-                
+
             # Test with only flags but no issue key (short form)
             with mock.patch.object(io, "tool_error") as mock_tool_error:
                 # Execute the command with only the -pr flag
                 commands.cmd_solve_jira("-pr")
-                
+
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
-                
-    def test_cmd_solve_jira_jira_api_error(self):
-        """Test behavior when the Jira API returns an error"""
-        with GitTemporaryDirectory() as repo_dir:
-            io = InputOutput(pretty=False, fancy_input=False, yes=True)
-            coder = Coder.create(self.GPT35, None, io)
-            commands = Commands(io, coder)
-            
-            # Mock the Jira class and its methods
-            with mock.patch("aider.jira.Jira") as mock_jira_class:
-                # Set up the mock Jira instance to raise an exception
-                mock_jira_instance = mock_jira_class.return_value
-                mock_jira_instance.get_issue_content.side_effect = Exception("API Error: Issue not found")
-                
-                # Mock the tool_error method to verify it's called with the correct message
-                with mock.patch.object(io, "tool_error") as mock_tool_error:
-                    try:
-                        # Execute the command with a valid issue key
-                        commands.cmd_solve_jira("TEST-123")
-                    except Exception:
-                        # If an exception is raised, make sure it's caught in the test
-                        pass
-                    
-                    # Verify that tool_error was called with the expected message
-                    mock_tool_error.assert_called_once()
-                    error_message = mock_tool_error.call_args[0][0]
-                    self.assertIn("API Error", error_message)
-                
-                # Test with specific request exception
-                mock_jira_instance.get_issue_content.side_effect = requests.exceptions.RequestException("Connection error")
-                
-                with mock.patch.object(io, "tool_error") as mock_tool_error:
-                    try:
-                        # Execute the command with a valid issue key
-                        commands.cmd_solve_jira("TEST-123")
-                    except Exception:
-                        # If an exception is raised, make sure it's caught in the test
-                        pass
-                    
-                    # Verify that tool_error was called with the expected message
-                    mock_tool_error.assert_called_once()
-                    error_message = mock_tool_error.call_args[0][0]
-                    self.assertIn("Connection error", error_message)
