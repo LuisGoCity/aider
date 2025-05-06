@@ -2857,7 +2857,17 @@ class TestCommands(TestCase):
             ):
                 # Set up the mock Jira instance
                 mock_jira_instance = mock_jira_class.return_value
-                mock_jira_instance.get_issue_content.return_value = {"key": "TEST-123", "summary": "Test issue"}
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description with requirements",
+                    "comments": [
+                        {
+                            "author": "Test User",
+                            "last_updated": "2023-01-01T12:00:00",
+                            "comment": "Test comment"
+                        }
+                    ]
+                }
                 
                 # Execute the command
                 commands.cmd_solve_jira("TEST-123")
@@ -2865,10 +2875,13 @@ class TestCommands(TestCase):
                 # Verify Jira API was called with the correct issue key
                 mock_jira_instance.get_issue_content.assert_called_once_with("TEST-123")
                 
-                # Verify the ticket content was written to a file
+                # Verify the ticket content was written to a file with proper JSON content
                 mock_write_text.assert_called_once()
                 file_path_arg = mock_write_text.call_args[1]["filename"]
+                file_content_arg = mock_write_text.call_args[1]["content"]
                 self.assertEqual(file_path_arg, "jira_issue_TEST-123.txt")
+                self.assertIn("Test issue summary", file_content_arg)
+                self.assertIn("Test issue description", file_content_arg)
                 
                 # Verify plan implementation was called with the ticket file
                 mock_plan_implementation.assert_called_once_with("jira_issue_TEST-123.txt")
