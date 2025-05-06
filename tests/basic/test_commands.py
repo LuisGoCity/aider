@@ -3033,3 +3033,34 @@ class TestCommands(TestCase):
                 
                 # Verify that cmd_raise_pr was called to create a pull request
                 mock_raise_pr.assert_called_once()
+                
+    def test_cmd_solve_jira_no_issue_key(self):
+        """Test error handling when no issue key is provided"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock the tool_error method to verify it's called with the correct message
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Execute the command with no issue key
+                commands.cmd_solve_jira("")
+                
+                # Verify that tool_error was called with the expected message
+                mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
+                
+            # Test with only flags but no issue key
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Execute the command with only the --with-pr flag
+                commands.cmd_solve_jira("--with-pr")
+                
+                # Verify that tool_error was called with the expected message
+                mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
+                
+            # Test with only flags but no issue key (short form)
+            with mock.patch.object(io, "tool_error") as mock_tool_error:
+                # Execute the command with only the -pr flag
+                commands.cmd_solve_jira("-pr")
+                
+                # Verify that tool_error was called with the expected message
+                mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
