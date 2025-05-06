@@ -548,6 +548,61 @@ class GitRepo:
             self.io.tool_error(f"Error executing git push command: {str(e)}")
             return False, f"Error executing git push command: {str(e)}"
 
+    def find_pr_template(self):
+        """
+        Search for PR templates in the repository.
+
+        Looks for "pull_request_template.md" (case insensitive) in:
+        - Root directory
+        - docs/ directory
+        - .github/ directory
+        - Any PULL_REQUEST_TEMPLATE/ subdirectory in the above locations
+
+        Returns:
+            str or list: Path to a single template if only one is found,
+                         or a list of template paths if multiple are found in a
+                         PULL_REQUEST_TEMPLATE directory, or None if no templates are found.
+        """
+        template_locations = [
+            self.root,  # Root directory
+            os.path.join(self.root, "docs"),  # docs/ directory
+            os.path.join(self.root, ".github"),  # .github/ directory
+        ]
+
+        # Add PULL_REQUEST_TEMPLATE subdirectories
+        for location in template_locations.copy():
+            pr_template_dir = os.path.join(location, "PULL_REQUEST_TEMPLATE")
+            if os.path.isdir(pr_template_dir):
+                template_locations.append(pr_template_dir)
+
+        templates_found = []
+
+        # Search for templates in all locations
+        for location in template_locations:
+            if not os.path.isdir(location):
+                continue
+
+            # Look for pull_request_template.md (case insensitive)
+            for filename in os.listdir(location):
+                if filename.lower() == "pull_request_template.md":
+                    templates_found.append(os.path.join(location, filename))
+
+            # If we're in a PULL_REQUEST_TEMPLATE directory, also look for any .md files
+            if os.path.basename(location) == "PULL_REQUEST_TEMPLATE":
+                for filename in os.listdir(location):
+                    if (
+                        filename.lower().endswith(".md")
+                        and os.path.join(location, filename) not in templates_found
+                    ):
+                        templates_found.append(os.path.join(location, filename))
+
+        if not templates_found:
+            return None
+        elif len(templates_found) == 1:
+            return templates_found[0]
+        else:
+            return templates_found
+
     def raise_pr(self, base_branch, compare_branch, pr_title, pr_description):
         """Raise a PR via the git cli."""
         # Check if GitHub CLI is available

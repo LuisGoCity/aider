@@ -368,36 +368,72 @@ class Commands:
             self.io.tool_error(f"Unable to complete raise_pr: {err}")
             return
 
+        # Look for PR templates first
+        templates = self.coder.repo.find_pr_template()
+        selected_template = None
         # Instantiate context coder
         from aider.coders.base_coder import Coder
 
-        context_coder = Coder.create(
+        ask_coder = Coder.create(
             io=self.io,
             from_coder=self.coder,
             edit_format="ask",
             summarize_from_coder=False,
         )
+        if templates:
+            if isinstance(templates, list) and len(templates) > 1:
+                # Multiple templates found, select the appropriate
 
-        # Add prompt for description
+                # Read the content of each template
+                template_contents = {path: self.io.read_text(path) for path in templates}
+
+                if template_contents:
+                    # Analyze commit history and changed files to determine the best template
+                    selection_prompt = (
+                        f"Based on this commit history: {commit_history} over these files"
+                        f" {changed_files}, which of these PR templates should be used to raise a PR"
+                        " in this repo. Return only the filename of the most appropriate template."
+                        f" Here are the options: {json.dumps(list(template_contents.keys()), indent=4)}"
+                    )
+                    selected_template_name = ask_coder.run(selection_prompt)
+                    selected_template = template_contents.get(selected_template_name)
+                    if not selected_template:
+                        # Fallback to the first template if the selected one wasn't found
+                        selected_template = template_contents[next(iter(template_contents))]
+            else:
+                # Single template found
+                template_path = templates[0] if isinstance(templates, list) else templates
+                selected_template = self.io.read_text(template_path)
+
+        # Add prompt for description, including template if found
         description_prompt = (
             "Based on the changes in this branch and the files added to chat, please generate a"
-            " detailed PR description (without a title) that explains:\n- What changes were made"
+            " detailed PR description that explains:\n- What changes were made"
             " \n- Why these changes were made \n- Any important implementation details \n- Any"
-            " testing considerations.\n - Make sure the PR description only discussed changes"
-            f" appearing in the commithistory.\nCommit history: \n{commit_history}\n Format your"
-            " response as a markdown description suitable for a pull request. Exclude any"
-            " explanations around commitsadd plan.md files or similar."
+            " testing considerations.\n - Make sure the PR description only discusses changes"
+            f" appearing in the commit history.\nCommit history: \n{commit_history}\n"
         )
 
+        # If a template was found, include it in the prompt
+        if selected_template:
+            description_prompt += (
+                "\nPlease format your response according to the following PR template"
+                f" structure:\n\n{selected_template}\n\nFill in all relevant sections of the"
+                " template with appropriate content based on the changes."
+            )
+
         # Run description and store output in variable
-        pr_description = context_coder.run(description_prompt)
+        pr_description = ask_coder.run(description_prompt)
 
         title_prompt = (
             "Based on this PR description, generate a concise, descriptive title (one line):\n"
             f"{pr_description}\n Return only the title text, nothing else."
         )
 
-        pr_title = context_coder.run(title_prompt).strip()
+        pr_title = ask_coder.run(title_prompt).strip()
+
+        # Pass the IO object to the repo for output messages
+        self.coder.repo.io = self.io
 
         self.coder.repo.raise_pr(default_branch, current_branch, pr_title, pr_description)
 

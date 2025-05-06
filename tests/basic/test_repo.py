@@ -925,3 +925,223 @@ class TestRepo(unittest.TestCase):
 
                     # Verify the method returned False for failure
                     self.assertFalse(result)
+
+    def test_find_pr_template_root_directory(self):
+        """Test that find_pr_template correctly identifies PR templates in the root directory"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create a PR template file in the root directory
+            template_path = Path("pull_request_template.md")
+            template_content = "## Description\n\nPlease include a summary of the change"
+            template_path.write_text(template_content)
+
+            # Add the template to git
+            raw_repo.git.add(str(template_path))
+            raw_repo.git.commit("-m", "Add PR template")
+
+            # Create GitRepo instance
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+
+            # Call find_pr_template method
+            result = git_repo.find_pr_template()
+
+            # Verify the method found the template
+            self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent
+            template_path = result_parent_dir / template_path
+            self.assertEqual(result, str(template_path))
+
+            # Test with uppercase filename
+            template_path.unlink()  # Remove the existing template
+            uppercase_template_path = Path("PULL_REQUEST_TEMPLATE.md")
+            uppercase_template_path.write_text(template_content)
+
+            # Force Git to recognize case change by configuring core.ignorecase
+            raw_repo.git.config("core.ignorecase", "false")
+
+            # Add all changes including deletions
+            raw_repo.git.add("--all")
+            raw_repo.git.commit("-m", "Add uppercase PR template")
+
+            # Call find_pr_template method again
+            result = git_repo.find_pr_template()
+
+            # Verify the method found the uppercase template
+            self.assertIsNotNone(result)
+            # The result should be the absolute path to the uppercase template
+            expected_path = str(Path(git_repo.root) / uppercase_template_path)
+            self.assertEqual(result, expected_path)
+
+    def test_find_pr_template_docs_directory(self):
+        """Test that find_pr_template correctly identifies PR templates in the docs directory"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create docs directory
+            docs_dir = Path("docs")
+            docs_dir.mkdir(exist_ok=True)
+
+            # Create a PR template file in the docs directory
+            template_path = docs_dir / "pull_request_template.md"
+            template_content = "## Description\n\nPlease include a summary of the change"
+            template_path.write_text(template_content)
+
+            # Add the template to git
+            raw_repo.git.add(str(template_path))
+            raw_repo.git.commit("-m", "Add PR template in docs directory")
+
+            # Create GitRepo instance
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+
+            # Call find_pr_template method
+            result = git_repo.find_pr_template()
+
+            # Verify the method found the template
+            self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            template_path = result_parent_dir / template_path
+            self.assertEqual(result, str(template_path))
+
+            # Test with mixed case filename
+            template_path.unlink()  # Remove the existing template
+            mixed_case_template_path = docs_dir / "Pull_Request_Template.md"
+            mixed_case_template_path.write_text(template_content)
+            # Force Git to recognize case change by configuring core.ignorecase
+            raw_repo.git.config("core.ignorecase", "false")
+
+            # Add all changes including deletions
+            raw_repo.git.add("--all")
+            raw_repo.git.commit("-m", "Add mixed case PR template in docs directory")
+
+            # Call find_pr_template method again
+            result = git_repo.find_pr_template()
+
+            # Verify the method found the mixed case template
+            self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            mixed_case_template_path = result_parent_dir / mixed_case_template_path
+            self.assertEqual(result, str(mixed_case_template_path))
+
+    def test_find_pr_template_github_directory(self):
+        """Test that find_pr_template correctly identifies PR templates in the .github directory"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create .github directory
+            github_dir = Path(".github")
+            github_dir.mkdir(exist_ok=True)
+
+            # Create a PR template file in the .github directory
+            template_path = github_dir / "pull_request_template.md"
+            template_content = "## Description\n\nPlease include a summary of the change"
+            template_path.write_text(template_content)
+
+            # Add the template to git
+            raw_repo.git.add(str(template_path))
+            raw_repo.git.commit("-m", "Add PR template in .github directory")
+
+            # Create GitRepo instance
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+
+            # Call find_pr_template method
+            result = git_repo.find_pr_template()
+
+            # Verify the method found the template
+            self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            template_path = result_parent_dir / template_path
+            self.assertEqual(result, str(template_path))
+
+            # Test with different case filename
+            template_path.unlink()  # Remove the existing template
+            different_case_template_path = github_dir / "PULL_REQUEST_TEMPLATE.md"
+            different_case_template_path.write_text(template_content)
+            # Force Git to recognize case change by configuring core.ignorecase
+            raw_repo.git.config("core.ignorecase", "false")
+
+            # Add all changes including deletions
+            raw_repo.git.add("--all")
+            raw_repo.git.commit("-m", "Add different case PR template in .github directory")
+            # Call find_pr_template method again
+            result = git_repo.find_pr_template()
+
+            # Verify the method found the different case template
+            self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            template_path = result_parent_dir / template_path
+            self.assertEqual(result, str(different_case_template_path))
+
+    def test_find_pr_template_in_subdirectories(self):
+        """Test that find_pr_template correctly identifies PR templates in PULL_REQUEST_TEMPLATE"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Test cases for different locations of PULL_REQUEST_TEMPLATE directories
+            test_locations = [
+                Path("."),  # Root PULL_REQUEST_TEMPLATE directory
+                Path("docs"),  # docs/PULL_REQUEST_TEMPLATE directory
+                Path(".github"),  # .github/PULL_REQUEST_TEMPLATE directory
+            ]
+
+            for base_dir in test_locations:
+                # Create base directory if it doesn't exist
+                if str(base_dir) != ".":
+                    base_dir.mkdir(exist_ok=True)
+
+                # Create PULL_REQUEST_TEMPLATE subdirectory
+                template_dir = base_dir / "PULL_REQUEST_TEMPLATE"
+                template_dir.mkdir(exist_ok=True)
+
+                # Create a single template file
+                template_path = template_dir / "default.md"
+                template_content = (
+                    f"## Template in {base_dir}/PULL_REQUEST_TEMPLATE\n\nPlease include a summary"
+                    " of the change"
+                )
+                template_path.write_text(template_content)
+
+                # Add the template to git
+                raw_repo.git.add(str(template_path))
+                raw_repo.git.commit(
+                    "-m", f"Add PR template in {base_dir}/PULL_REQUEST_TEMPLATE directory"
+                )
+
+                # Create GitRepo instance
+                io = InputOutput()
+                git_repo = GitRepo(io, None, None)
+
+                # Call find_pr_template method
+                result = git_repo.find_pr_template()
+
+                # Verify the method found the template
+                self.assertIsNotNone(result)
+                if str(base_dir) != ".":
+                    result_parent_dir = Path(result).parent.parent.parent
+                else:
+                    result_parent_dir = Path(result).parent.parent
+                template_path = result_parent_dir / template_path
+                self.assertEqual(result, str(template_path))
+
+                # Clean up for next test
+                import shutil
+
+                if str(base_dir) != ".":
+                    shutil.rmtree(base_dir)
+                else:
+                    shutil.rmtree(template_dir)
