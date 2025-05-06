@@ -637,7 +637,6 @@ class GitRepo:
             pass
 
         if gh_available:
-            
             # Push changes to remote with the specific branch name
             success, error_message = self.push_commited_changes(branch_name=compare_branch.name)
             if not success:

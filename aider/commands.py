@@ -368,40 +368,10 @@ class Commands:
             self.io.tool_error(f"Unable to complete raise_pr: {err}")
             return
 
-        # Instantiate context coder
-        from aider.coders.base_coder import Coder
-
-        context_coder = Coder.create(
-            io=self.io,
-            from_coder=self.coder,
-            edit_format="ask",
-            summarize_from_coder=False,
-        )
-
-        # Add prompt for description
-        description_prompt = (
-            "Based on the changes in this branch and the files added to chat, please generate a"
-            " detailed PR description (without a title) that explains:\n- What changes were made"
-            " \n- Why these changes were made \n- Any important implementation details \n- Any"
-            " testing considerations.\n - Make sure the PR description only discussed changes"
-            f" appearing in the commithistory.\nCommit history: \n{commit_history}\n Format your"
-            " response as a markdown description suitable for a pull request. Exclude any"
-            " explanations around commitsadd plan.md files or similar."
-        )
-
-        # Run description and store output in variable
-        pr_description = context_coder.run(description_prompt)
-
-        title_prompt = (
-            "Based on this PR description, generate a concise, descriptive title (one line):\n"
-            f"{pr_description}\n Return only the title text, nothing else."
-        )
-
-        pr_title = context_coder.run(title_prompt).strip()
-
-        # Look for PR templates
+        # Look for PR templates first
         templates = self.coder.repo.find_pr_template()
         template_path = None
+        template_content = None
         
         if templates:
             if isinstance(templates, list) and len(templates) > 1:
@@ -410,12 +380,12 @@ class Commands:
                 
                 # Read the content of each template
                 template_contents = {}
-                for template_path in templates:
+                for path in templates:
                     try:
-                        with open(template_path, 'r', encoding='utf-8') as f:
-                            template_contents[template_path] = f.read()
+                        with open(path, 'r', encoding='utf-8') as f:
+                            template_contents[path] = f.read()
                     except Exception as e:
-                        self.io.tool_warning(f"Failed to read template {template_path}: {e}")
+                        self.io.tool_warning(f"Failed to read template {path}: {e}")
                 
                 if template_contents:
                     # Analyze commit history and changed files to determine the best template
@@ -439,49 +409,74 @@ class Commands:
                             if 'feat' in commit_history.lower() and 'feature' in template_name:
                                 score += 3
                             
-                        # Check template content for relevant sections
-                        content_lower = content.lower()
-                        if 'bug' in pr_title.lower() and 'bug' in content_lower:
-                            score += 2
-                        if 'feature' in pr_title.lower() and 'feature' in content_lower:
-                            score += 2
-                        if 'documentation' in pr_title.lower() and 'documentation' in content_lower:
-                            score += 2
-                            
                         template_scores[path] = score
                     
                     # Select the template with the highest score
                     if template_scores:
                         best_template = max(template_scores.items(), key=lambda x: x[1])[0]
                         template_path = best_template
+                        template_content = template_contents[best_template]
                         self.io.tool_output(f"Selected PR template: {os.path.basename(template_path)}")
                     else:
                         template_path = templates[0]
+                        template_content = template_contents[template_path]
                         self.io.tool_output(f"Using default PR template: {os.path.basename(template_path)}")
                 else:
                     template_path = templates[0]
             else:
                 # Single template found
                 template_path = templates[0] if isinstance(templates, list) else templates
-                self.io.tool_output(f"Using PR template: {os.path.basename(template_path)}")
+                try:
+                    with open(template_path, 'r', encoding='utf-8') as f:
+                        template_content = f.read()
+                    self.io.tool_output(f"Using PR template: {os.path.basename(template_path)}")
+                except Exception as e:
+                    self.io.tool_warning(f"Failed to read PR template {template_path}: {e}")
+
+        # Instantiate context coder
+        from aider.coders.base_coder import Coder
+
+        context_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format="ask",
+            summarize_from_coder=False,
+        )
+
+        # Add prompt for description, including template if found
+        description_prompt = (
+            "Based on the changes in this branch and the files added to chat, please generate a"
+            " detailed PR description that explains:\n- What changes were made"
+            " \n- Why these changes were made \n- Any important implementation details \n- Any"
+            " testing considerations.\n - Make sure the PR description only discusses changes"
+            f" appearing in the commit history.\nCommit history: \n{commit_history}\n"
+        )
         
-        # Pass the template path to raise_pr
+        # If a template was found, include it in the prompt
+        if template_content:
+            description_prompt += (
+                f"\nPlease format your response according to the following PR template structure:"
+                f"\n\n{template_content}\n\n"
+                f"Fill in all relevant sections of the template with appropriate content based on the changes."
+            )
+        else:
+            description_prompt += (
+                "\nFormat your response as a markdown description suitable for a pull request."
+                " Exclude any explanations around commits, plan.md files or similar."
+            )
+
+        # Run description and store output in variable
+        pr_description = context_coder.run(description_prompt)
+
+        title_prompt = (
+            "Based on this PR description, generate a concise, descriptive title (one line):\n"
+            f"{pr_description}\n Return only the title text, nothing else."
+        )
+
+        pr_title = context_coder.run(title_prompt).strip()
+        
+        # Pass the IO object to the repo for output messages
         self.coder.repo.io = self.io
-        
-        # If a template was found, read its content and append the PR description
-        if template_path:
-            try:
-                with open(template_path, 'r', encoding='utf-8') as f:
-                    template_content = f.read()
-                    
-                # Combine the PR description with the template
-                # Add the original description at the top, followed by the template
-                combined_description = f"{pr_description}\n\n{template_content}"
-                
-                # Update the PR description
-                pr_description = combined_description
-            except Exception as e:
-                self.io.tool_warning(f"Failed to read PR template {template_path}: {e}")
         
         self.coder.repo.raise_pr(default_branch, current_branch, pr_title, pr_description)
 
