@@ -1710,7 +1710,7 @@ class Commands:
                 with_pr = True
                 parts.pop(i)
             elif part in ("--with-code-cleanup", "-cleanup"):
-                with_code_cleanup = False
+                with_code_cleanup = True
                 parts.pop(i)
             else:
                 i += 1
