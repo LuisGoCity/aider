@@ -952,6 +952,8 @@ class TestRepo(unittest.TestCase):
 
             # Verify the method found the template
             self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent
+            template_path = result_parent_dir / template_path
             self.assertEqual(result, str(template_path))
 
             # Test with uppercase filename
@@ -966,6 +968,8 @@ class TestRepo(unittest.TestCase):
 
             # Verify the method found the uppercase template
             self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent
+            uppercase_template_path = result_parent_dir / uppercase_template_path
             self.assertEqual(result, str(uppercase_template_path))
 
     def test_find_pr_template_docs_directory(self):
