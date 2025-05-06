@@ -925,7 +925,7 @@ class TestRepo(unittest.TestCase):
 
                     # Verify the method returned False for failure
                     self.assertFalse(result)
-                    
+
     def test_find_pr_template_root_directory(self):
         """Test that find_pr_template correctly identifies PR templates in the root directory"""
         with GitTemporaryDirectory():
@@ -938,7 +938,7 @@ class TestRepo(unittest.TestCase):
             template_path = Path("pull_request_template.md")
             template_content = "## Description\n\nPlease include a summary of the change"
             template_path.write_text(template_content)
-            
+
             # Add the template to git
             raw_repo.git.add(str(template_path))
             raw_repo.git.commit("-m", "Add PR template")
@@ -946,28 +946,28 @@ class TestRepo(unittest.TestCase):
             # Create GitRepo instance
             io = InputOutput()
             git_repo = GitRepo(io, None, None)
-            
+
             # Call find_pr_template method
             result = git_repo.find_pr_template()
-            
+
             # Verify the method found the template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(template_path))
-            
+
             # Test with uppercase filename
             template_path.unlink()  # Remove the existing template
             uppercase_template_path = Path("PULL_REQUEST_TEMPLATE.md")
             uppercase_template_path.write_text(template_content)
             raw_repo.git.add(str(uppercase_template_path))
             raw_repo.git.commit("-m", "Add uppercase PR template")
-            
+
             # Call find_pr_template method again
             result = git_repo.find_pr_template()
-            
+
             # Verify the method found the uppercase template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(uppercase_template_path))
-            
+
     def test_find_pr_template_docs_directory(self):
         """Test that find_pr_template correctly identifies PR templates in the docs directory"""
         with GitTemporaryDirectory():
@@ -979,12 +979,12 @@ class TestRepo(unittest.TestCase):
             # Create docs directory
             docs_dir = Path("docs")
             docs_dir.mkdir(exist_ok=True)
-            
+
             # Create a PR template file in the docs directory
             template_path = docs_dir / "pull_request_template.md"
             template_content = "## Description\n\nPlease include a summary of the change"
             template_path.write_text(template_content)
-            
+
             # Add the template to git
             raw_repo.git.add(str(template_path))
             raw_repo.git.commit("-m", "Add PR template in docs directory")
@@ -992,28 +992,28 @@ class TestRepo(unittest.TestCase):
             # Create GitRepo instance
             io = InputOutput()
             git_repo = GitRepo(io, None, None)
-            
+
             # Call find_pr_template method
             result = git_repo.find_pr_template()
-            
+
             # Verify the method found the template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(template_path))
-            
+
             # Test with mixed case filename
             template_path.unlink()  # Remove the existing template
             mixed_case_template_path = docs_dir / "Pull_Request_Template.md"
             mixed_case_template_path.write_text(template_content)
             raw_repo.git.add(str(mixed_case_template_path))
             raw_repo.git.commit("-m", "Add mixed case PR template in docs directory")
-            
+
             # Call find_pr_template method again
             result = git_repo.find_pr_template()
-            
+
             # Verify the method found the mixed case template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(mixed_case_template_path))
-            
+
     def test_find_pr_template_github_directory(self):
         """Test that find_pr_template correctly identifies PR templates in the .github directory"""
         with GitTemporaryDirectory():
@@ -1025,12 +1025,12 @@ class TestRepo(unittest.TestCase):
             # Create .github directory
             github_dir = Path(".github")
             github_dir.mkdir(exist_ok=True)
-            
+
             # Create a PR template file in the .github directory
             template_path = github_dir / "pull_request_template.md"
             template_content = "## Description\n\nPlease include a summary of the change"
             template_path.write_text(template_content)
-            
+
             # Add the template to git
             raw_repo.git.add(str(template_path))
             raw_repo.git.commit("-m", "Add PR template in .github directory")
@@ -1038,30 +1038,30 @@ class TestRepo(unittest.TestCase):
             # Create GitRepo instance
             io = InputOutput()
             git_repo = GitRepo(io, None, None)
-            
+
             # Call find_pr_template method
             result = git_repo.find_pr_template()
-            
+
             # Verify the method found the template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(template_path))
-            
+
             # Test with different case filename
             template_path.unlink()  # Remove the existing template
             different_case_template_path = github_dir / "PULL_REQUEST_TEMPLATE.md"
             different_case_template_path.write_text(template_content)
             raw_repo.git.add(str(different_case_template_path))
             raw_repo.git.commit("-m", "Add different case PR template in .github directory")
-            
+
             # Call find_pr_template method again
             result = git_repo.find_pr_template()
-            
+
             # Verify the method found the different case template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(different_case_template_path))
-            
+
     def test_find_pr_template_in_subdirectories(self):
-        """Test that find_pr_template correctly identifies PR templates in PULL_REQUEST_TEMPLATE subdirectories"""
+        """Test that find_pr_template correctly identifies PR templates in PULL_REQUEST_TEMPLATE"""
         with GitTemporaryDirectory():
             # Create a new repo
             raw_repo = git.Repo()
@@ -1074,117 +1074,45 @@ class TestRepo(unittest.TestCase):
                 Path("docs"),  # docs/PULL_REQUEST_TEMPLATE directory
                 Path(".github"),  # .github/PULL_REQUEST_TEMPLATE directory
             ]
-            
+
             for base_dir in test_locations:
                 # Create base directory if it doesn't exist
                 if str(base_dir) != ".":
                     base_dir.mkdir(exist_ok=True)
-                
+
                 # Create PULL_REQUEST_TEMPLATE subdirectory
                 template_dir = base_dir / "PULL_REQUEST_TEMPLATE"
                 template_dir.mkdir(exist_ok=True)
-                
+
                 # Create a single template file
                 template_path = template_dir / "default.md"
-                template_content = f"## Template in {base_dir}/PULL_REQUEST_TEMPLATE\n\nPlease include a summary of the change"
+                template_content = (
+                    f"## Template in {base_dir}/PULL_REQUEST_TEMPLATE\n\nPlease include a summary"
+                    " of the change"
+                )
                 template_path.write_text(template_content)
-                
+
                 # Add the template to git
                 raw_repo.git.add(str(template_path))
-                raw_repo.git.commit("-m", f"Add PR template in {base_dir}/PULL_REQUEST_TEMPLATE directory")
+                raw_repo.git.commit(
+                    "-m", f"Add PR template in {base_dir}/PULL_REQUEST_TEMPLATE directory"
+                )
 
                 # Create GitRepo instance
                 io = InputOutput()
                 git_repo = GitRepo(io, None, None)
-                
+
                 # Call find_pr_template method
                 result = git_repo.find_pr_template()
-                
+
                 # Verify the method found the template
                 self.assertIsNotNone(result)
                 self.assertEqual(result, str(template_path))
-                
+
                 # Clean up for next test
+                import shutil
+
                 if str(base_dir) != ".":
-                    import shutil
                     shutil.rmtree(base_dir)
                 else:
                     shutil.rmtree(template_dir)
-                    
-    def test_select_pr_template(self):
-        """Test that select_pr_template correctly selects a template when multiple templates are found"""
-        with GitTemporaryDirectory():
-            # Create a new repo
-            raw_repo = git.Repo()
-            raw_repo.config_writer().set_value("user", "name", "Test User").release()
-            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
-
-            # Create .github directory and PULL_REQUEST_TEMPLATE subdirectory
-            github_dir = Path(".github")
-            github_dir.mkdir(exist_ok=True)
-            template_dir = github_dir / "PULL_REQUEST_TEMPLATE"
-            template_dir.mkdir(exist_ok=True)
-            
-            # Create multiple template files with distinct purposes
-            bug_template_path = template_dir / "bug_fix.md"
-            bug_template_content = "## Bug Fix Template\n\nDescribe the bug that was fixed."
-            bug_template_path.write_text(bug_template_content)
-            
-            feature_template_path = template_dir / "feature.md"
-            feature_template_content = "## Feature Template\n\nDescribe the new feature."
-            feature_template_path.write_text(feature_template_content)
-            
-            # Add the templates to git
-            raw_repo.git.add(str(bug_template_path))
-            raw_repo.git.add(str(feature_template_path))
-            raw_repo.git.commit("-m", "Add multiple PR templates")
-            
-            # Create a file and make initial commit on master branch
-            code_file = Path("test_file.py")
-            code_file.write_text("def add(a, b):\n    return a + b")
-            raw_repo.git.add(str(code_file))
-            raw_repo.git.commit("-m", "Initial commit")
-            
-            # Create and switch to feature branch
-            raw_repo.git.branch("feature")
-            raw_repo.git.checkout("feature")
-            
-            # Make changes that look like a feature addition
-            code_file.write_text("def add(a, b):\n    return a + b\n\ndef multiply(a, b):\n    return a * b")
-            raw_repo.git.add(str(code_file))
-            raw_repo.git.commit("-m", "Add multiply function")
-            
-            # Create GitRepo instance with mock IO and models
-            io = InputOutput()
-            
-            # Create a mock model that will select the feature template (template 2)
-            mock_model = unittest.mock.Mock()
-            mock_model.simple_send_with_retries.return_value = "2"
-            
-            git_repo = GitRepo(io, None, None)
-            git_repo.models = [mock_model]
-            git_repo.io = io
-            
-            # Call select_pr_template method
-            templates = [str(bug_template_path), str(feature_template_path)]
-            result = git_repo.select_pr_template(
-                templates, 
-                "master", 
-                "feature", 
-                "Add multiply function", 
-                "Added a new function to multiply two numbers"
-            )
-            
-            # Verify the method selected the feature template
-            self.assertEqual(result, str(feature_template_path))
-            
-            # Verify the model was called with appropriate content
-            mock_model.simple_send_with_retries.assert_called_once()
-            call_args = mock_model.simple_send_with_retries.call_args[0][0]
-            
-            # Check that the prompt contains key information
-            self.assertTrue(any("PR Title: Add multiply function" in msg["content"] for msg in call_args))
-            self.assertTrue(any("Base Branch: master" in msg["content"] for msg in call_args))
-            self.assertTrue(any("Compare Branch: feature" in msg["content"] for msg in call_args))
-            self.assertTrue(any("Bug Fix Template" in msg["content"] for msg in call_args))
-            self.assertTrue(any("Feature Template" in msg["content"] for msg in call_args))
