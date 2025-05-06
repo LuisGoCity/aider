@@ -3194,10 +3194,10 @@ class TestCommands(TestCase):
             io = InputOutput(pretty=False, fancy_input=False, yes=True)
             coder = Coder.create(self.GPT35, None, io)
             commands = Commands(io, coder)
-
+            
             # Create a mock manager to track the order of method calls
             mock_manager = mock.MagicMock()
-
+            
             # Mock the Jira class and its methods
             with (
                 mock.patch("aider.jira.Jira") as mock_jira_class,
@@ -3221,7 +3221,7 @@ class TestCommands(TestCase):
                         }
                     ],
                 }
-
+                
                 # Set up side effects to track call order
                 mock_write_text.side_effect = lambda **kwargs: mock_manager.write_text(**kwargs)
                 mock_plan_implementation.side_effect = (
@@ -3232,36 +3232,98 @@ class TestCommands(TestCase):
                 mock_code_from_plan.side_effect = (
                     lambda *args, **kwargs: mock_manager.code_from_plan(*args, **kwargs)
                 )
-
+                
                 # Execute the command
                 commands.cmd_solve_jira("TEST-123")
-
+                
                 # Verify the correct sequence of method calls
                 mock_calls = mock_manager.mock_calls
                 call_names = [call[0] for call in mock_calls]
-
+                
                 # Check that write_text is called first (to create the ticket file)
                 self.assertEqual(call_names[0], "write_text")
-
+                
                 # Check that plan_implementation is called next
                 self.assertEqual(call_names[1], "plan_implementation")
                 self.assertEqual(
                     mock_plan_implementation.call_args[0][0], "jira_issue_TEST-123.txt"
                 )
-
+                
                 # Check that clear_history and drop_files are called before code_from_plan
                 self.assertIn("clear_history", call_names)
                 self.assertIn("drop_files", call_names)
                 clear_index = call_names.index("clear_history")
                 drop_index = call_names.index("drop_files")
                 code_index = call_names.index("code_from_plan")
-
+                
                 # Verify the order: clear_history -> drop_files -> code_from_plan
                 self.assertLess(clear_index, code_index)
                 self.assertLess(drop_index, code_index)
-
+                
                 # Check that code_from_plan is called with the correct implementation plan file
                 self.assertEqual(
                     mock_code_from_plan.call_args[0][0],
                     "jira_issue_TEST-123_implementation_plan.md",
                 )
+                
+    def test_cmd_solve_jira_file_cleanup(self):
+        """Test that temporary files are properly cleaned up"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Create test files to simulate the files that should be cleaned up
+            ticket_file = Path(repo_dir) / "jira_issue_TEST-123.txt"
+            ticket_file.write_text("Test ticket content")
+            
+            plan_file = Path(repo_dir) / "jira_issue_TEST-123_implementation_plan.md"
+            plan_file.write_text("# Implementation Plan\n\n## Steps\n1. Step 1\n2. Step 2")
+            
+            # Mock the necessary methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(commands, "cmd_plan_implementation"),
+                mock.patch.object(commands, "_clear_chat_history"),
+                mock.patch.object(commands, "_drop_all_files"),
+                mock.patch.object(commands, "cmd_code_from_plan"),
+                mock.patch("os.remove") as mock_remove,
+                mock.patch("os.path.exists", return_value=True),
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description",
+                    "comments": []
+                }
+                
+                # Execute the command
+                commands.cmd_solve_jira("TEST-123")
+                
+                # Verify that os.remove was called for both temporary files
+                mock_remove.assert_any_call("jira_issue_TEST-123.txt")
+                mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
+                self.assertEqual(mock_remove.call_count, 2)
+                
+                # Test with file not found scenario
+                mock_remove.reset_mock()
+                mock_remove.side_effect = FileNotFoundError("File not found")
+                
+                with mock.patch.object(io, "tool_error") as mock_tool_error:
+                    commands.cmd_solve_jira("TEST-123")
+                    
+                    # Verify that tool_error was called when file removal fails
+                    self.assertEqual(mock_remove.call_count, 2)
+                    mock_tool_error.assert_any_call(mock.ANY)
+                
+                # Test with permission error scenario
+                mock_remove.reset_mock()
+                mock_remove.side_effect = PermissionError("Permission denied")
+                
+                with mock.patch.object(io, "tool_error") as mock_tool_error:
+                    commands.cmd_solve_jira("TEST-123")
+                    
+                    # Verify that tool_error was called when file removal fails
+                    self.assertEqual(mock_remove.call_count, 2)
+                    mock_tool_error.assert_any_call(mock.ANY)
