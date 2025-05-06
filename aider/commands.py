@@ -385,46 +385,8 @@ class Commands:
 
                 if template_contents:
                     # Analyze commit history and changed files to determine the best template
-                    template_scores = {}
+                    pass
 
-                    # Simple heuristics for template selection
-                    for path, content in template_contents.items():
-                        score = 0
-                        template_name = os.path.basename(path).lower()
-
-                        # Check if any changed files match template keywords
-                        for file in changed_files:
-                            file_lower = file.lower()
-                            # Score based on file types
-                            if "test" in file_lower and "test" in template_name:
-                                score += 2
-                            if "doc" in file_lower and "documentation" in template_name:
-                                score += 2
-                            if "fix" in commit_history.lower() and (
-                                "bug" in template_name or "fix" in template_name
-                            ):
-                                score += 3
-                            if "feat" in commit_history.lower() and "feature" in template_name:
-                                score += 3
-
-                        template_scores[path] = score
-
-                    # Select the template with the highest score
-                    if template_scores:
-                        best_template = max(template_scores.items(), key=lambda x: x[1])[0]
-                        template_path = best_template
-                        template_content = template_contents[best_template]
-                        self.io.tool_output(
-                            f"Selected PR template: {os.path.basename(template_path)}"
-                        )
-                    else:
-                        template_path = templates[0]
-                        template_content = template_contents[template_path]
-                        self.io.tool_output(
-                            f"Using default PR template: {os.path.basename(template_path)}"
-                        )
-                else:
-                    template_path = templates[0]
             else:
                 # Single template found
                 template_path = templates[0] if isinstance(templates, list) else templates

@@ -551,16 +551,16 @@ class GitRepo:
     def find_pr_template(self):
         """
         Search for PR templates in the repository.
-        
+
         Looks for "pull_request_template.md" (case insensitive) in:
         - Root directory
         - docs/ directory
         - .github/ directory
         - Any PULL_REQUEST_TEMPLATE/ subdirectory in the above locations
-        
+
         Returns:
             str or list: Path to a single template if only one is found,
-                         or a list of template paths if multiple are found in a 
+                         or a list of template paths if multiple are found in a
                          PULL_REQUEST_TEMPLATE directory, or None if no templates are found.
         """
         template_locations = [
@@ -568,132 +568,41 @@ class GitRepo:
             os.path.join(self.root, "docs"),  # docs/ directory
             os.path.join(self.root, ".github"),  # .github/ directory
         ]
-        
+
         # Add PULL_REQUEST_TEMPLATE subdirectories
         for location in template_locations.copy():
             pr_template_dir = os.path.join(location, "PULL_REQUEST_TEMPLATE")
             if os.path.isdir(pr_template_dir):
                 template_locations.append(pr_template_dir)
-        
+
         templates_found = []
-        
+
         # Search for templates in all locations
         for location in template_locations:
             if not os.path.isdir(location):
                 continue
-                
+
             # Look for pull_request_template.md (case insensitive)
             for filename in os.listdir(location):
                 if filename.lower() == "pull_request_template.md":
                     templates_found.append(os.path.join(location, filename))
-                    
+
             # If we're in a PULL_REQUEST_TEMPLATE directory, also look for any .md files
             if os.path.basename(location) == "PULL_REQUEST_TEMPLATE":
                 for filename in os.listdir(location):
-                    if filename.lower().endswith(".md") and os.path.join(location, filename) not in templates_found:
+                    if (
+                        filename.lower().endswith(".md")
+                        and os.path.join(location, filename) not in templates_found
+                    ):
                         templates_found.append(os.path.join(location, filename))
-        
+
         if not templates_found:
             return None
         elif len(templates_found) == 1:
             return templates_found[0]
         else:
             return templates_found
-    
-    def select_pr_template(self, templates, base_branch, compare_branch, pr_title, pr_description):
-        """
-        Use an LLM call to select the appropriate PR template when multiple templates are found.
-        
-        Args:
-            templates (list): List of paths to PR templates
-            base_branch (str): The base branch for the PR
-            compare_branch (str): The compare branch for the PR
-            pr_title (str): The title of the PR
-            pr_description (str): The description of the PR
-            
-        Returns:
-            str: Path to the selected template, or None if selection fails
-        """
-        if not templates:
-            return None
-            
-        if len(templates) == 1:
-            return templates[0]
-            
-        # Read the content of each template
-        template_contents = {}
-        for template_path in templates:
-            try:
-                with open(template_path, 'r', encoding='utf-8') as f:
-                    template_contents[template_path] = f.read()
-            except Exception as e:
-                self.io.tool_warning(f"Failed to read template {template_path}: {e}")
-                
-        if not template_contents:
-            return None
-            
-        # Get commit history and changed files for context
-        try:
-            commit_history = self.get_commit_history(base_branch, compare_branch)
-            changed_files = self.get_changed_files(base_branch, compare_branch)
-        except Exception as e:
-            commit_history = "Could not retrieve commit history"
-            changed_files = []
-            self.io.tool_warning(f"Failed to get commit history or changed files: {e}")
-            
-        # Prepare the prompt for the LLM
-        prompt = f"""
-I need to select the most appropriate PR template for a pull request with the following details:
 
-PR Title: {pr_title}
-PR Description: {pr_description}
-
-Base Branch: {base_branch}
-Compare Branch: {compare_branch}
-
-Commit History:
-{commit_history}
-
-Changed Files:
-{', '.join(changed_files) if changed_files else 'No files changed'}
-
-Available PR Templates:
-"""
-        
-        # Add template contents to the prompt
-        for i, (path, content) in enumerate(template_contents.items(), 1):
-            template_name = os.path.basename(path)
-            prompt += f"\n--- Template {i}: {template_name} ---\n{content}\n"
-            
-        prompt += "\nBased on the PR details and the available templates, which template (by number) is the most appropriate to use? Respond with just the template number."
-        
-        # Make the LLM call
-        messages = [
-            {"role": "system", "content": "You are an expert software engineer helping to select the most appropriate PR template based on the PR details and available templates."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        try:
-            for model in self.models:
-                response = model.simple_send_with_retries(messages)
-                if response:
-                    # Extract the template number from the response
-                    import re
-                    match = re.search(r'(\d+)', response)
-                    if match:
-                        template_num = int(match.group(1))
-                        if 1 <= template_num <= len(templates):
-                            self.io.tool_output(f"Selected PR template: {os.path.basename(templates[template_num-1])}")
-                            return templates[template_num-1]
-                    
-                    self.io.tool_warning(f"Could not parse template selection from LLM response: {response}")
-        except Exception as e:
-            self.io.tool_error(f"Error selecting PR template: {e}")
-            
-        # If we couldn't select a template, use the first one as a fallback
-        self.io.tool_warning("Could not select a specific PR template, using the first one as fallback")
-        return templates[0]
-            
     def raise_pr(self, base_branch, compare_branch, pr_title, pr_description):
         """Raise a PR via the git cli."""
         # Check if GitHub CLI is available
