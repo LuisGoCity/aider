@@ -2028,7 +2028,12 @@ class TestCommands(TestCase):
                     commands, "_from_plan_exist_strategy"
                 ) as mock_from_plan_exist_strategy,
                 mock.patch.object(io, "tool_output") as mock_tool_output,
+                mock.patch.object(commands, "_with_auto_confirm") as mock_with_auto_confirm,
             ):
+                # Mock the context manager
+                mock_context = mock.MagicMock()
+                mock_with_auto_confirm.return_value.__enter__.return_value = mock_context
+                mock_with_auto_confirm.return_value.__exit__.return_value = None
                 # Mock the coder.run method to return a step count
                 mock_run_instance = mock.MagicMock()
                 mock_run_instance.run.return_value = "2"
@@ -2059,6 +2064,9 @@ class TestCommands(TestCase):
 
                     # Verify that _from_plan_exist_strategy was called once
                     mock_from_plan_exist_strategy.assert_called_once()
+                    
+                    # Verify that _with_auto_confirm was called once
+                    mock_with_auto_confirm.assert_called_once()
 
                     # Verify that tool_output was called with the expected messages
                     mock_tool_output.assert_any_call("Found 2 steps in the plan.")
