@@ -383,9 +383,10 @@ class Commands:
             "Based on the changes in this branch and the files added to chat, please generate a"
             " detailed PR description (without a title) that explains:\n- What changes were made"
             " \n- Why these changes were made \n- Any important implementation details \n- Any"
-            f" testing considerations.\nCommit history: \n{commit_history}\n Format your response"
-            " as a markdown description suitable for a pull request. Exclude any explanations"
-            " around commitsadd plan.md files or similar."
+            " testing considerations.\n - Make sure the PR description only discussed changes"
+            f" appearing in the commithistory.\nCommit history: \n{commit_history}\n Format your"
+            " response as a markdown description suitable for a pull request. Exclude any"
+            " explanations around commitsadd plan.md files or similar."
         )
 
         # Run description and store output in variable
