@@ -705,6 +705,36 @@ Available PR Templates:
             pass
 
         if gh_available:
+            # Look for PR templates
+            template_path = None
+            templates = self.find_pr_template()
+            
+            if templates:
+                if isinstance(templates, list):
+                    # Multiple templates found, use LLM to select the appropriate one
+                    template_path = self.select_pr_template(
+                        templates, base_branch, compare_branch, pr_title, pr_description
+                    )
+                else:
+                    # Single template found
+                    template_path = templates
+                    
+            # If a template was found, read its content and append the PR description
+            if template_path:
+                try:
+                    with open(template_path, 'r', encoding='utf-8') as f:
+                        template_content = f.read()
+                        
+                    # Combine the PR description with the template
+                    # Add the original description at the top, followed by the template
+                    combined_description = f"{pr_description}\n\n{template_content}"
+                    
+                    # Update the PR description
+                    pr_description = combined_description
+                    self.io.tool_output(f"Using PR template: {os.path.basename(template_path)}")
+                except Exception as e:
+                    self.io.tool_warning(f"Failed to read PR template {template_path}: {e}")
+            
             # Push changes to remote with the specific branch name
             success, error_message = self.push_commited_changes(branch_name=compare_branch.name)
             if not success:
