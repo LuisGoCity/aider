@@ -1013,3 +1013,49 @@ class TestRepo(unittest.TestCase):
             # Verify the method found the mixed case template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(mixed_case_template_path))
+            
+    def test_find_pr_template_github_directory(self):
+        """Test that find_pr_template correctly identifies PR templates in the .github directory"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Create .github directory
+            github_dir = Path(".github")
+            github_dir.mkdir(exist_ok=True)
+            
+            # Create a PR template file in the .github directory
+            template_path = github_dir / "pull_request_template.md"
+            template_content = "## Description\n\nPlease include a summary of the change"
+            template_path.write_text(template_content)
+            
+            # Add the template to git
+            raw_repo.git.add(str(template_path))
+            raw_repo.git.commit("-m", "Add PR template in .github directory")
+
+            # Create GitRepo instance
+            io = InputOutput()
+            git_repo = GitRepo(io, None, None)
+            
+            # Call find_pr_template method
+            result = git_repo.find_pr_template()
+            
+            # Verify the method found the template
+            self.assertIsNotNone(result)
+            self.assertEqual(result, str(template_path))
+            
+            # Test with different case filename
+            template_path.unlink()  # Remove the existing template
+            different_case_template_path = github_dir / "PULL_REQUEST_TEMPLATE.md"
+            different_case_template_path.write_text(template_content)
+            raw_repo.git.add(str(different_case_template_path))
+            raw_repo.git.commit("-m", "Add different case PR template in .github directory")
+            
+            # Call find_pr_template method again
+            result = git_repo.find_pr_template()
+            
+            # Verify the method found the different case template
+            self.assertIsNotNone(result)
+            self.assertEqual(result, str(different_case_template_path))
