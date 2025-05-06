@@ -349,7 +349,6 @@ class Commands:
             self.io.tool_error("No git repository found.")
             return
 
-        self._clear_chat_history()
         self._drop_all_files()
 
         current_branch = self.coder.repo.repo.active_branch
