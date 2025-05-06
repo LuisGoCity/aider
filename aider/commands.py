@@ -560,8 +560,7 @@ class Commands:
         self.io.tool_output(f"Dropping files in chat: {files2drop}")
         self.cmd_drop(" ".join(files2drop))
 
-    def _from_plan_exist_strategy(self, original_confirmation_ask_method):
-        self.io.confirm_ask = original_confirmation_ask_method
+    def _from_plan_exist_strategy(self):
         self.io.tool_output("\nPlan execution completed!")
         raise SwitchCoder(
             edit_format=self.coder.edit_format,
