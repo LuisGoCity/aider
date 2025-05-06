@@ -1696,15 +1696,12 @@ class Commands:
             # Check if the implementation plan file exists
             if os.path.exists(implementation_plan):
                 try:
-                    # Add the implementation plan file to git staging
-                    self.coder.repo.repo.git.add(implementation_plan)
                     # Create a commit with a descriptive message
                     self.coder.repo.commit(
                         fnames=[implementation_plan],
                         message=f"Add implementation plan for JIRA issue {issue_key_or_id}",
-                        aider_edits=True
+                        aider_edits=True,
                     )
-                    self.io.tool_output(f"Committed implementation plan for JIRA issue {issue_key_or_id}")
                 except ANY_GIT_ERROR as err:
                     self.io.tool_error(f"Unable to commit implementation plan: {err}")
             else:
@@ -1720,18 +1717,13 @@ class Commands:
             try:
                 # Remove the file from the file system
                 os.remove(implementation_plan)
-                self.io.tool_output(f"Deleted implementation plan file: {implementation_plan}")
-                
-                # Add the deletion to git staging
-                self.coder.repo.repo.git.add(implementation_plan)
-                
+
                 # Create a commit for the deletion
                 self.coder.repo.commit(
                     fnames=[implementation_plan],
-                    message=f"Remove implementation plan for JIRA issue {issue_key_or_id}",
-                    aider_edits=True
+                    message=f"Delete implementation plan for JIRA issue {issue_key_or_id} from git",
+                    aider_edits=True,
                 )
-                self.io.tool_output(f"Committed deletion of implementation plan for JIRA issue {issue_key_or_id}")
             except OSError as err:
                 self.io.tool_error(f"Unable to delete implementation plan file: {err}")
             except ANY_GIT_ERROR as err:
@@ -1742,36 +1734,19 @@ class Commands:
             try:
                 # Remove the file from the file system
                 os.remove(path_to_ticket)
-                self.io.tool_output(f"Deleted JIRA ticket file: {path_to_ticket}")
-                
-                # Add the deletion to git staging
-                self.coder.repo.repo.git.add(path_to_ticket)
-                
+
                 # Create a commit for the deletion
                 self.coder.repo.commit(
                     fnames=[path_to_ticket],
                     message=f"Remove JIRA ticket file for issue {issue_key_or_id}",
-                    aider_edits=True
+                    aider_edits=True,
                 )
-                self.io.tool_output(f"Committed deletion of JIRA ticket file for issue {issue_key_or_id}")
             except OSError as err:
                 self.io.tool_error(f"Unable to delete JIRA ticket file: {err}")
             except ANY_GIT_ERROR as err:
                 self.io.tool_error(f"Unable to commit deletion of JIRA ticket file: {err}")
 
         if with_pr:
-            # Verify all necessary files have been committed before raising PR
-            uncommitted_changes = False
-            try:
-                if self.coder.repo:
-                    status = self.coder.repo.repo.git.status(porcelain=True)
-                    if status.strip():
-                        uncommitted_changes = True
-                        self.io.tool_warning("There are uncommitted changes in the repository.")
-                        self.io.tool_warning("Consider committing these changes before raising a PR.")
-            except ANY_GIT_ERROR as err:
-                self.io.tool_error(f"Unable to check git status: {err}")
-            
             # Proceed with PR creation
             self.io.tool_output("Creating pull request with all committed changes...")
             self.cmd_raise_pr()
