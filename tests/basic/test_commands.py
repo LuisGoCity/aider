@@ -3464,10 +3464,10 @@ class TestCommands(TestCase):
                 mock.patch.object(coder.repo, "raise_pr") as mock_raise_pr,
                 mock.patch.object(io, "read_text", return_value="Template content"),
                 mock.patch("json.dumps", return_value='["template1", "template2"]'),
-                mock.patch.object(mock_context_coder, "run", side_effect=["feature.md", "PR description", "PR title"]),
             ):
                 # Create mock context coder
                 mock_context_coder = mock.MagicMock()
+                mock_context_coder.run.side_effect = ["feature.md", "PR description", "PR title"]
                 mock_context_coder.run.side_effect = ["PR description", "PR title"]
                 mock_create_coder.return_value = mock_context_coder
 
