@@ -1059,3 +1059,54 @@ class TestRepo(unittest.TestCase):
             # Verify the method found the different case template
             self.assertIsNotNone(result)
             self.assertEqual(result, str(different_case_template_path))
+            
+    def test_find_pr_template_in_subdirectories(self):
+        """Test that find_pr_template correctly identifies PR templates in PULL_REQUEST_TEMPLATE subdirectories"""
+        with GitTemporaryDirectory():
+            # Create a new repo
+            raw_repo = git.Repo()
+            raw_repo.config_writer().set_value("user", "name", "Test User").release()
+            raw_repo.config_writer().set_value("user", "email", "test@example.com").release()
+
+            # Test cases for different locations of PULL_REQUEST_TEMPLATE directories
+            test_locations = [
+                Path("."),  # Root PULL_REQUEST_TEMPLATE directory
+                Path("docs"),  # docs/PULL_REQUEST_TEMPLATE directory
+                Path(".github"),  # .github/PULL_REQUEST_TEMPLATE directory
+            ]
+            
+            for base_dir in test_locations:
+                # Create base directory if it doesn't exist
+                if str(base_dir) != ".":
+                    base_dir.mkdir(exist_ok=True)
+                
+                # Create PULL_REQUEST_TEMPLATE subdirectory
+                template_dir = base_dir / "PULL_REQUEST_TEMPLATE"
+                template_dir.mkdir(exist_ok=True)
+                
+                # Create a single template file
+                template_path = template_dir / "default.md"
+                template_content = f"## Template in {base_dir}/PULL_REQUEST_TEMPLATE\n\nPlease include a summary of the change"
+                template_path.write_text(template_content)
+                
+                # Add the template to git
+                raw_repo.git.add(str(template_path))
+                raw_repo.git.commit("-m", f"Add PR template in {base_dir}/PULL_REQUEST_TEMPLATE directory")
+
+                # Create GitRepo instance
+                io = InputOutput()
+                git_repo = GitRepo(io, None, None)
+                
+                # Call find_pr_template method
+                result = git_repo.find_pr_template()
+                
+                # Verify the method found the template
+                self.assertIsNotNone(result)
+                self.assertEqual(result, str(template_path))
+                
+                # Clean up for next test
+                if str(base_dir) != ".":
+                    import shutil
+                    shutil.rmtree(base_dir)
+                else:
+                    shutil.rmtree(template_dir)
