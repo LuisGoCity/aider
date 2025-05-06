@@ -399,6 +399,10 @@ class Commands:
 
         pr_title = context_coder.run(title_prompt).strip()
 
+        # Pass the models to the repo for potential LLM calls during PR template selection
+        self.coder.repo.models = self.coder.models
+        self.coder.repo.io = self.io
+        
         self.coder.repo.raise_pr(default_branch, current_branch, pr_title, pr_description)
 
     def cmd_lint(self, args="", fnames=None):
