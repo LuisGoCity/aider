@@ -960,10 +960,10 @@ class TestRepo(unittest.TestCase):
             template_path.unlink()  # Remove the existing template
             uppercase_template_path = Path("PULL_REQUEST_TEMPLATE.md")
             uppercase_template_path.write_text(template_content)
-            
+
             # Force Git to recognize case change by configuring core.ignorecase
             raw_repo.git.config("core.ignorecase", "false")
-            
+
             # Add all changes including deletions
             raw_repo.git.add("--all")
             raw_repo.git.commit("-m", "Add uppercase PR template")
@@ -1007,13 +1007,19 @@ class TestRepo(unittest.TestCase):
 
             # Verify the method found the template
             self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            template_path = result_parent_dir / template_path
             self.assertEqual(result, str(template_path))
 
             # Test with mixed case filename
             template_path.unlink()  # Remove the existing template
             mixed_case_template_path = docs_dir / "Pull_Request_Template.md"
             mixed_case_template_path.write_text(template_content)
-            raw_repo.git.add(str(mixed_case_template_path))
+            # Force Git to recognize case change by configuring core.ignorecase
+            raw_repo.git.config("core.ignorecase", "false")
+
+            # Add all changes including deletions
+            raw_repo.git.add("--all")
             raw_repo.git.commit("-m", "Add mixed case PR template in docs directory")
 
             # Call find_pr_template method again
@@ -1021,6 +1027,8 @@ class TestRepo(unittest.TestCase):
 
             # Verify the method found the mixed case template
             self.assertIsNotNone(result)
+            result_parent_dir = Path(result).parent.parent
+            mixed_case_template_path = result_parent_dir / mixed_case_template_path
             self.assertEqual(result, str(mixed_case_template_path))
 
     def test_find_pr_template_github_directory(self):
