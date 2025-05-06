@@ -807,17 +807,15 @@ class InputOutput:
         Auto-say no to running shell commands
         For everything else, use the original confirm_ask method
         """
-        # Auto-say yes to adding files to context
-        if "Add file to the chat?" in question:
+        auto_yes = ["Add file to the chat?", "Create new file?", "Attempt to fix lint errors?"]
+
+        auto_no = ["Run shell command?"]
+
+        if any([True for sub_question in auto_yes if sub_question in question]):
             return True
 
-        # Auto-say no to running shell commands
-        if "Run shell command?" in question:
+        if any([True for sub_question in auto_no if sub_question in question]):
             return False
-
-        # Auto-say yes to creating files to context
-        if "Create new file?" in question:
-            return True
 
         # For everything else, use the original confirm_ask method
         self.num_user_asks += 1
