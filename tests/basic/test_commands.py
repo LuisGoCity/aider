@@ -3064,3 +3064,38 @@ class TestCommands(TestCase):
                 
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
+                
+    def test_cmd_solve_jira_jira_api_error(self):
+        """Test behavior when the Jira API returns an error"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock the Jira class and its methods
+            with mock.patch("aider.jira.Jira") as mock_jira_class:
+                # Set up the mock Jira instance to raise an exception
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.side_effect = Exception("API Error: Issue not found")
+                
+                # Mock the tool_error method to verify it's called with the correct message
+                with mock.patch.object(io, "tool_error") as mock_tool_error:
+                    # Execute the command with a valid issue key
+                    commands.cmd_solve_jira("TEST-123")
+                    
+                    # Verify that tool_error was called with the expected message
+                    mock_tool_error.assert_called_once()
+                    error_message = mock_tool_error.call_args[0][0]
+                    self.assertIn("API Error", error_message)
+                
+                # Test with specific request exception
+                mock_jira_instance.get_issue_content.side_effect = requests.exceptions.RequestException("Connection error")
+                
+                with mock.patch.object(io, "tool_error") as mock_tool_error:
+                    # Execute the command with a valid issue key
+                    commands.cmd_solve_jira("TEST-123")
+                    
+                    # Verify that tool_error was called with the expected message
+                    mock_tool_error.assert_called_once()
+                    error_message = mock_tool_error.call_args[0][0]
+                    self.assertIn("Connection error", error_message)
