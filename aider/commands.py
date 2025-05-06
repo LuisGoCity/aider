@@ -1691,12 +1691,64 @@ class Commands:
         self.cmd_plan_implementation(path_to_ticket)
         implementation_plan = os.path.splitext(path_to_ticket)[0] + "_implementation_plan.md"
 
+        # Commit the implementation plan if repo exists
+        if self.coder.repo:
+            # Check if the implementation plan file exists
+            if os.path.exists(implementation_plan):
+                try:
+                    # Create a commit with a descriptive message
+                    self.coder.repo.commit(
+                        fnames=[implementation_plan],
+                        message=f"Add implementation plan for JIRA issue {issue_key_or_id}",
+                        aider_edits=True,
+                    )
+                except ANY_GIT_ERROR as err:
+                    self.io.tool_error(f"Unable to commit implementation plan: {err}")
+            else:
+                self.io.tool_error(f"Implementation plan file not found: {implementation_plan}")
+
         self._clear_chat_history()
         self._drop_all_files()
 
         self.cmd_code_from_plan(implementation_plan, switch_coder=False)
 
+        # Delete the implementation plan file before raising PR
+        if self.coder.repo and os.path.exists(implementation_plan):
+            try:
+                # Remove the file from the file system
+                os.remove(implementation_plan)
+
+                # Create a commit for the deletion
+                self.coder.repo.commit(
+                    fnames=[implementation_plan],
+                    message=f"Delete implementation plan for JIRA issue {issue_key_or_id} from git",
+                    aider_edits=True,
+                )
+            except OSError as err:
+                self.io.tool_error(f"Unable to delete implementation plan file: {err}")
+            except ANY_GIT_ERROR as err:
+                self.io.tool_error(f"Unable to commit deletion of implementation plan: {err}")
+
+        # Delete the JIRA ticket file before raising PR
+        if self.coder.repo and os.path.exists(path_to_ticket):
+            try:
+                # Remove the file from the file system
+                os.remove(path_to_ticket)
+
+                # Create a commit for the deletion
+                self.coder.repo.commit(
+                    fnames=[path_to_ticket],
+                    message=f"Remove JIRA ticket file for issue {issue_key_or_id}",
+                    aider_edits=True,
+                )
+            except OSError as err:
+                self.io.tool_error(f"Unable to delete JIRA ticket file: {err}")
+            except ANY_GIT_ERROR as err:
+                self.io.tool_error(f"Unable to commit deletion of JIRA ticket file: {err}")
+
         if with_pr:
+            # Proceed with PR creation
+            self.io.tool_output("Creating pull request with all committed changes...")
             self.cmd_raise_pr()
 
     def cmd_plan_implementation(self, args):
