@@ -3327,3 +3327,50 @@ class TestCommands(TestCase):
                     # Verify that tool_error was called when file removal fails
                     self.assertEqual(mock_remove.call_count, 2)
                     mock_tool_error.assert_any_call(mock.ANY)
+                    
+    def test_cmd_solve_jira_no_repo(self):
+        """Test behavior when no git repository is available"""
+        with ChdirTemporaryDirectory() as temp_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Ensure there's no repo
+            self.assertIsNone(coder.repo)
+            
+            # Mock the necessary methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(io, "write_text") as mock_write_text,
+                mock.patch.object(commands, "cmd_plan_implementation") as mock_plan_implementation,
+                mock.patch.object(commands, "_clear_chat_history") as mock_clear_history,
+                mock.patch.object(commands, "_drop_all_files") as mock_drop_files,
+                mock.patch.object(commands, "cmd_code_from_plan") as mock_code_from_plan,
+                mock.patch("os.path.exists", return_value=True),
+                mock.patch("os.remove") as mock_remove,
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description with requirements",
+                    "comments": []
+                }
+                
+                # Execute the command
+                commands.cmd_solve_jira("TEST-123")
+                
+                # Verify that the command still works without a repo
+                mock_jira_instance.get_issue_content.assert_called_once_with("TEST-123")
+                mock_write_text.assert_called_once()
+                mock_plan_implementation.assert_called_once()
+                mock_clear_history.assert_called_once()
+                mock_drop_files.assert_called_once()
+                mock_code_from_plan.assert_called_once()
+                
+                # Verify that file operations still work
+                mock_remove.assert_any_call("jira_issue_TEST-123.txt")
+                mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
+                
+                # Verify that no git operations were attempted
+                # This is implicit since we're not mocking any git operations
