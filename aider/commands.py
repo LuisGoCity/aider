@@ -391,13 +391,14 @@ class Commands:
                     # Analyze commit history and changed files to determine the best template
                     selection_prompt = (
                         f"Based on this commit history: {commit_history} over these files"
-                        f" {changed_files},which of these PR templates should be used to raise a PR"
-                        " in this repo. Return only one, the name(key of json object) of the most"
-                        f" appropriate fit. Here are the options {json.dumps(templates, indent=4)}"
+                        f" {changed_files}, which of these PR templates should be used to raise a PR"
+                        " in this repo. Return only the filename of the most appropriate template."
+                        f" Here are the options: {json.dumps(list(template_contents.keys()), indent=4)}"
                     )
                     selected_template_name = ask_coder.run(selection_prompt)
                     selected_template = template_contents.get(selected_template_name)
                     if not selected_template:
+                        # Fallback to the first template if the selected one wasn't found
                         selected_template = template_contents[next(iter(template_contents))]
             else:
                 # Single template found
