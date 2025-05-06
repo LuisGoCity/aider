@@ -2900,3 +2900,68 @@ class TestCommands(TestCase):
                 # Verify temporary files were removed
                 mock_remove.assert_any_call("jira_issue_TEST-123.txt")
                 mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
+                
+    def test_cmd_solve_jira_with_pr_flag(self):
+        """Test execution with the --with-pr flag"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock the Jira class and its methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(io, "write_text") as mock_write_text,
+                mock.patch.object(commands, "cmd_plan_implementation") as mock_plan_implementation,
+                mock.patch.object(commands, "_clear_chat_history") as mock_clear_history,
+                mock.patch.object(commands, "_drop_all_files") as mock_drop_files,
+                mock.patch.object(commands, "cmd_code_from_plan") as mock_code_from_plan,
+                mock.patch.object(commands, "cmd_raise_pr") as mock_raise_pr,
+                mock.patch("os.path.exists", return_value=True),
+                mock.patch("os.remove") as mock_remove,
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description with requirements",
+                    "comments": [
+                        {
+                            "author": "Test User",
+                            "last_updated": "2023-01-01T12:00:00",
+                            "comment": "Test comment"
+                        }
+                    ]
+                }
+                
+                # Execute the command with --with-pr flag
+                commands.cmd_solve_jira("TEST-123 --with-pr")
+                
+                # Verify Jira API was called with the correct issue key
+                mock_jira_instance.get_issue_content.assert_called_once_with("TEST-123")
+                
+                # Verify the ticket content was written to a file
+                mock_write_text.assert_called_once()
+                file_path_arg = mock_write_text.call_args[1]["filename"]
+                self.assertEqual(file_path_arg, "jira_issue_TEST-123.txt")
+                
+                # Verify plan implementation was called with the ticket file
+                mock_plan_implementation.assert_called_once_with("jira_issue_TEST-123.txt")
+                
+                # Verify chat history was cleared and files were dropped
+                mock_clear_history.assert_called_once()
+                mock_drop_files.assert_called_once()
+                
+                # Verify code_from_plan was called with the implementation plan file
+                mock_code_from_plan.assert_called_once()
+                self.assertEqual(
+                    mock_code_from_plan.call_args[0][0],
+                    "jira_issue_TEST-123_implementation_plan.md"
+                )
+                
+                # Verify temporary files were removed
+                mock_remove.assert_any_call("jira_issue_TEST-123.txt")
+                mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
+                
+                # Verify that cmd_raise_pr was called to create a pull request
+                mock_raise_pr.assert_called_once()
