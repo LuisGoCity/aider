@@ -2099,9 +2099,10 @@ Just show me the edits I need to make.
         self.io.tool_output("Cleanup operations to perform:")
         for i, prompt in enumerate(selected_prompts, 1):
             self.io.tool_output(f"  {i}. {prompt}")
-        original_confirm_ask = self.io.confirm_ask
-        self.io.confirm_ask = self.io.auto_confirm_ask
-        for file_path in code_files:
+        
+        # Use the context manager to automatically confirm prompts
+        with self._with_auto_confirm():
+            for file_path in code_files:
             abs_path = os.path.join(self.coder.root, file_path)
 
             # Check if file exists and can be read
@@ -2133,7 +2134,6 @@ Just show me the edits I need to make.
                 self.io.tool_error(f"Error processing {file_path}: {str(e)}")
                 continue
 
-        self.io.confirm_ask = original_confirm_ask
 
 
 def expand_subdir(file_path):
