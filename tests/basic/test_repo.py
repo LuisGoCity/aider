@@ -968,9 +968,9 @@ class TestRepo(unittest.TestCase):
 
             # Verify the method found the uppercase template
             self.assertIsNotNone(result)
-            result_parent_dir = Path(result).parent
-            uppercase_template_path = result_parent_dir / uppercase_template_path
-            self.assertEqual(result, str(uppercase_template_path))
+            # The result should be the absolute path to the uppercase template
+            expected_path = str(Path(git_repo.root) / uppercase_template_path)
+            self.assertEqual(result, expected_path)
 
     def test_find_pr_template_docs_directory(self):
         """Test that find_pr_template correctly identifies PR templates in the docs directory"""
