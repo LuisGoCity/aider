@@ -3041,27 +3041,89 @@ class TestCommands(TestCase):
             io = InputOutput(pretty=False, fancy_input=False, yes=True)
             coder = Coder.create(self.GPT35, None, io)
             commands = Commands(io, coder)
-
+            
             # Mock the tool_error method to verify it's called with the correct message
             with mock.patch.object(io, "tool_error") as mock_tool_error:
                 # Execute the command with no issue key
                 commands.cmd_solve_jira("")
-
+                
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
-
+                
             # Test with only flags but no issue key
             with mock.patch.object(io, "tool_error") as mock_tool_error:
                 # Execute the command with only the --with-pr flag
                 commands.cmd_solve_jira("--with-pr")
-
+                
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
-
+                
             # Test with only flags but no issue key (short form)
             with mock.patch.object(io, "tool_error") as mock_tool_error:
                 # Execute the command with only the -pr flag
                 commands.cmd_solve_jira("-pr")
-
+                
                 # Verify that tool_error was called with the expected message
                 mock_tool_error.assert_called_once_with("Please provide a JIRA issue key or ID")
+                
+    def test_cmd_solve_jira_file_operations(self):
+        """Test file creation and deletion operations"""
+        with GitTemporaryDirectory() as repo_dir:
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+            coder = Coder.create(self.GPT35, None, io)
+            commands = Commands(io, coder)
+            
+            # Mock the Jira class and its methods
+            with (
+                mock.patch("aider.jira.Jira") as mock_jira_class,
+                mock.patch.object(io, "write_text") as mock_write_text,
+                mock.patch.object(commands, "cmd_plan_implementation") as mock_plan_implementation,
+                mock.patch.object(commands, "cmd_code_from_plan") as mock_code_from_plan,
+                mock.patch("os.path.exists", return_value=True),
+                mock.patch("os.remove") as mock_remove,
+                mock.patch.object(commands, "_clear_chat_history"),
+                mock.patch.object(commands, "_drop_all_files"),
+            ):
+                # Set up the mock Jira instance
+                mock_jira_instance = mock_jira_class.return_value
+                mock_jira_instance.get_issue_content.return_value = {
+                    "summary": "Test issue summary",
+                    "description": "Test issue description with requirements",
+                    "comments": [
+                        {
+                            "author": "Test User",
+                            "last_updated": "2023-01-01T12:00:00",
+                            "comment": "Test comment"
+                        }
+                    ]
+                }
+                
+                # Create a mock repo
+                mock_repo = mock.MagicMock()
+                coder.repo = mock_repo
+                
+                # Execute the command
+                commands.cmd_solve_jira("TEST-123")
+                
+                # Verify file creation
+                mock_write_text.assert_called_once()
+                file_path_arg = mock_write_text.call_args[1]["filename"]
+                self.assertEqual(file_path_arg, "jira_issue_TEST-123.txt")
+                
+                # Verify file deletion
+                mock_remove.assert_any_call("jira_issue_TEST-123.txt")
+                mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
+                self.assertEqual(mock_remove.call_count, 2)
+                
+                # Test with repo operations
+                mock_repo.reset_mock()
+                mock_write_text.reset_mock()
+                mock_remove.reset_mock()
+                
+                # Execute the command again
+                commands.cmd_solve_jira("TEST-123")
+                
+                # Verify file creation and deletion with repo operations
+                mock_write_text.assert_called_once()
+                mock_remove.assert_any_call("jira_issue_TEST-123.txt")
+                mock_remove.assert_any_call("jira_issue_TEST-123_implementation_plan.md")
