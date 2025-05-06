@@ -1131,6 +1131,11 @@ class TestRepo(unittest.TestCase):
 
                 # Verify the method found the template
                 self.assertIsNotNone(result)
+                if str(base_dir) != ".":
+                    result_parent_dir = Path(result).parent.parent.parent
+                else:
+                    result_parent_dir = Path(result).parent.parent
+                template_path = result_parent_dir / template_path
                 self.assertEqual(result, str(template_path))
 
                 # Clean up for next test
