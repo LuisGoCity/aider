@@ -37,6 +37,23 @@ class SwitchCoder(Exception):
 class Commands:
     voice = None
     scraper = None
+    
+    class _AutoConfirmContext:
+        """A context manager that temporarily sets io.confirm_ask to auto_confirm_ask."""
+        
+        def __init__(self, commands_instance):
+            self.commands = commands_instance
+            self.original_confirm_ask = None
+            
+        def __enter__(self):
+            self.original_confirm_ask = self.commands.io.confirm_ask
+            self.commands.io.confirm_ask = self.commands.io.auto_confirm_ask
+            return self
+            
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.commands.io.confirm_ask = self.original_confirm_ask
+            # Don't suppress exceptions
+            return False
 
     def clone(self):
         return Commands(
