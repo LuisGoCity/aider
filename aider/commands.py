@@ -1696,17 +1696,24 @@ class Commands:
             self.io.tool_error("Please provide a JIRA issue key or ID")
             return
 
-        # Parse arguments - look for --with-pr or -pr flag
+        # Parse arguments - look for flags
         parts = args.split()
         with_pr = False
+        with_code_cleanup = False
         issue_key_or_id = None
-
-        for i, part in enumerate(parts):
-            if part.lower() in ("--with-pr", "-pr"):
+        
+        # Process all flags
+        i = 0
+        while i < len(parts):
+            part = parts[i].lower()
+            if part in ("--with-pr", "-pr"):
                 with_pr = True
-                # Remove the flag from parts
                 parts.pop(i)
-                break
+            elif part in ("--with-code-cleanup", "-cleanup"):
+                with_code_cleanup = False
+                parts.pop(i)
+            else:
+                i += 1
 
         # The remaining parts should be the issue key/ID
         if parts:
