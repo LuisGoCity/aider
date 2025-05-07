@@ -38,6 +38,27 @@ class Commands:
     voice = None
     scraper = None
 
+    class _AutoConfirmContext:
+        """A context manager that temporarily sets io.confirm_ask to auto_confirm_ask."""
+
+        def __init__(self, commands_instance):
+            self.commands = commands_instance
+            self.original_confirm_ask = None
+
+        def __enter__(self):
+            self.original_confirm_ask = self.commands.io.confirm_ask
+            self.commands.io.confirm_ask = self.commands.io.auto_confirm_ask
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.commands.io.confirm_ask = self.original_confirm_ask
+            # Don't suppress exceptions
+            return False
+
+    def _with_auto_confirm(self):
+        """Returns a context manager that temporarily sets io.confirm_ask to auto_confirm_ask."""
+        return self._AutoConfirmContext(self)
+
     def clone(self):
         return Commands(
             self.io,
@@ -391,9 +412,10 @@ class Commands:
                     # Analyze commit history and changed files to determine the best template
                     selection_prompt = (
                         f"Based on this commit history: {commit_history} over these files"
-                        f" {changed_files}, which of these PR templates should be used to raise a PR"
-                        " in this repo. Return only the filename of the most appropriate template."
-                        f" Here are the options: {json.dumps(list(template_contents.keys()), indent=4)}"
+                        f" {changed_files}, which of these PR templates should be used to raise a"
+                        " PR in this repo. Return only the filename of the most appropriate"
+                        " template. Here are the options:"
+                        f" {json.dumps(list(template_contents.keys()), indent=4)}"
                     )
                     selected_template_name = ask_coder.run(selection_prompt)
                     selected_template = template_contents.get(selected_template_name)
@@ -539,8 +561,7 @@ class Commands:
         self.io.tool_output(f"Dropping files in chat: {files2drop}")
         self.cmd_drop(" ".join(files2drop))
 
-    def _from_plan_exist_strategy(self, original_confirmation_ask_method):
-        self.io.confirm_ask = original_confirmation_ask_method
+    def _from_plan_exist_strategy(self):
         self.io.tool_output("\nPlan execution completed!")
         raise SwitchCoder(
             edit_format=self.coder.edit_format,
@@ -1701,7 +1722,7 @@ class Commands:
         with_pr = False
         with_code_cleanup = False
         issue_key_or_id = None
-        
+
         # Process all flags
         i = 0
         while i < len(parts):
@@ -1868,24 +1889,22 @@ class Commands:
             " the number of steps."
         )
 
-        # change confirm_ask function to automatically say yes/no to specific commands.
-        original_confirm_ask = self.io.confirm_ask
-        self.io.confirm_ask = self.io.auto_confirm_ask
-
-        # Extract the number from the response
-        try:
-            step_count = int(response)
-            self.io.tool_output(f"Found {step_count} steps in the plan.")
-        except ValueError:
-            self.io.tool_output(
-                "Unable to determine number of steps. Will try to solve them all at once."
-            )
-            prompt = (
-                f"Please, implement the plan in the {Path(plan_path).name} file step by step. Add"
-                " any files, you require to implement this plan, to this chat."
-            )
-            self._run_new_coder(prompt, [Path(plan_path).name], False)
-            self._from_plan_exist_strategy(original_confirm_ask)
+        # Use the context manager to automatically confirm prompts
+        with self._with_auto_confirm():
+            # Extract the number from the response
+            try:
+                step_count = int(response)
+                self.io.tool_output(f"Found {step_count} steps in the plan.")
+            except ValueError:
+                self.io.tool_output(
+                    "Unable to determine number of steps. Will try to solve them all at once."
+                )
+                prompt = (
+                    f"Please, implement the plan in the {Path(plan_path).name} file step by step."
+                    " Add any files, you require to implement this plan, to this chat."
+                )
+                self._run_new_coder(prompt, [Path(plan_path).name], False)
+                self._from_plan_exist_strategy()
 
         try:
             for i in range(1, step_count + 1):
@@ -1900,7 +1919,7 @@ class Commands:
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
 
         if switch_coder:
-            self._from_plan_exist_strategy(original_confirm_ask)
+            self._from_plan_exist_strategy()
 
     def _get_language_from_extension(self, extension):
         """Helper method to get language name from file extension"""
@@ -1996,7 +2015,12 @@ Just show me the edits I need to make.
             self.io.tool_error("Could not determine default branch.")
             return
 
-        modified_files = self.coder.repo.get_changed_files(default_branch)
+        current_branch = self.coder.repo.repo.active_branch
+        if not current_branch:
+            self.io.tool_error("Could not determine current branch.")
+            return
+
+        modified_files = self.coder.repo.get_changed_files(default_branch, current_branch)
         if not modified_files:
             self.io.tool_output("No modified files found in the current branch.")
             return
@@ -2080,41 +2104,40 @@ Just show me the edits I need to make.
         self.io.tool_output("Cleanup operations to perform:")
         for i, prompt in enumerate(selected_prompts, 1):
             self.io.tool_output(f"  {i}. {prompt}")
-        original_confirm_ask = self.io.confirm_ask
-        self.io.confirm_ask = self.io.auto_confirm_ask
-        for file_path in code_files:
-            abs_path = os.path.join(self.coder.root, file_path)
 
-            # Check if file exists and can be read
-            if not os.path.exists(abs_path):
-                self.io.tool_warning(f"File {file_path} no longer exists, skipping.")
-                continue
+        # Use the context manager to automatically confirm prompts
+        with self._with_auto_confirm():
+            for file_path in code_files:
+                abs_path = os.path.join(self.coder.root, file_path)
 
-            self.io.tool_output(f"\nCleaning {file_path}...")
+                # Check if file exists and can be read
+                if not os.path.exists(abs_path):
+                    self.io.tool_warning(f"File {file_path} no longer exists, skipping.")
+                    continue
 
-            # Create a temporary coder instance for this file
-            try:
-                # Create a prompt for the file cleanup
-                file_extension = os.path.splitext(file_path)[1].lower()
-                language = self._get_language_from_extension(file_extension)
+                self.io.tool_output(f"\nCleaning {file_path}...")
 
-                cleanup_prompt = f"I need you to clean up the following {language} code file. "
-                cleanup_prompt += "Focus on these specific tasks:\n"
-                for task in selected_prompts:
-                    cleanup_prompt += f"- {task}\n"
-                cleanup_prompt += (
-                    "\nMake sure to preserve the functionality of the code while improving its"
-                    " quality."
-                )
-                self.cmd_add(file_path)
-                self._run_new_coder(
-                    prompt=cleanup_prompt, summarize_from_coder=True, exclude_from_drop=True
-                )
-            except Exception as e:
-                self.io.tool_error(f"Error processing {file_path}: {str(e)}")
-                continue
+                # Create a temporary coder instance for this file
+                try:
+                    # Create a prompt for the file cleanup
+                    file_extension = os.path.splitext(file_path)[1].lower()
+                    language = self._get_language_from_extension(file_extension)
 
-        self.io.confirm_ask = original_confirm_ask
+                    cleanup_prompt = f"I need you to clean up the following {language} code file. "
+                    cleanup_prompt += "Focus on these specific tasks:\n"
+                    for task in selected_prompts:
+                        cleanup_prompt += f"- {task}\n"
+                    cleanup_prompt += (
+                        "\nMake sure to preserve the functionality of the code while improving its"
+                        " quality."
+                    )
+                    self.cmd_add(file_path)
+                    self._run_new_coder(
+                        prompt=cleanup_prompt, summarize_from_coder=True, exclude_from_drop=True
+                    )
+                except Exception as e:
+                    self.io.tool_error(f"Error processing {file_path}: {str(e)}")
+                    continue
 
 
 def expand_subdir(file_path):

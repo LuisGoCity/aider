@@ -1955,6 +1955,56 @@ class TestCommands(TestCase):
             self.assertEqual(len(coder.abs_read_only_fnames), 0)
             self.assertEqual(len(coder.cur_messages), 0)
             self.assertEqual(len(coder.done_messages), 0)
+            
+    def test_with_auto_confirm_context_manager(self):
+        """Test that the _with_auto_confirm context manager properly sets and restores the confirm_ask method."""
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+        
+        # Create a mock for the original confirm_ask method
+        original_confirm_ask = io.confirm_ask
+        
+        # Create a mock for auto_confirm_ask to verify it's being used
+        mock_auto_confirm_ask = mock.MagicMock()
+        io.auto_confirm_ask = mock_auto_confirm_ask
+        
+        # Test the context manager
+        with commands._with_auto_confirm():
+            # Inside the context, confirm_ask should be set to auto_confirm_ask
+            self.assertEqual(io.confirm_ask, mock_auto_confirm_ask)
+            
+            # Call the confirm_ask method to verify it's using auto_confirm_ask
+            io.confirm_ask("Test question?")
+            mock_auto_confirm_ask.assert_called_once_with("Test question?")
+        
+        # After exiting the context, confirm_ask should be restored to the original
+        self.assertEqual(io.confirm_ask, original_confirm_ask)
+        
+    def test_with_auto_confirm_with_exception(self):
+        """Test that the _with_auto_confirm context manager restores the original confirm_ask method even when an exception occurs."""
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+        
+        # Store the original confirm_ask method
+        original_confirm_ask = io.confirm_ask
+        
+        # Test the context manager with an exception
+        try:
+            with commands._with_auto_confirm():
+                # Inside the context, confirm_ask should be set to auto_confirm_ask
+                self.assertEqual(io.confirm_ask, io.auto_confirm_ask)
+                
+                # Raise an exception
+                raise ValueError("Test exception")
+        except ValueError:
+            # Exception should be propagated
+            pass
+        
+        # After exiting the context, confirm_ask should be restored to the original
+        # even though an exception was raised
+        self.assertEqual(io.confirm_ask, original_confirm_ask)
 
     def test_cmd_code_from_plan_positive(self):
         with GitTemporaryDirectory() as repo_dir:
@@ -1978,7 +2028,12 @@ class TestCommands(TestCase):
                     commands, "_from_plan_exist_strategy"
                 ) as mock_from_plan_exist_strategy,
                 mock.patch.object(io, "tool_output") as mock_tool_output,
+                mock.patch.object(commands, "_with_auto_confirm") as mock_with_auto_confirm,
             ):
+                # Mock the context manager
+                mock_context = mock.MagicMock()
+                mock_with_auto_confirm.return_value.__enter__.return_value = mock_context
+                mock_with_auto_confirm.return_value.__exit__.return_value = None
                 # Mock the coder.run method to return a step count
                 mock_run_instance = mock.MagicMock()
                 mock_run_instance.run.return_value = "2"
@@ -2009,6 +2064,9 @@ class TestCommands(TestCase):
 
                     # Verify that _from_plan_exist_strategy was called once
                     mock_from_plan_exist_strategy.assert_called_once()
+                    
+                    # Verify that _with_auto_confirm was called once
+                    mock_with_auto_confirm.assert_called_once()
 
                     # Verify that tool_output was called with the expected messages
                     mock_tool_output.assert_any_call("Found 2 steps in the plan.")
