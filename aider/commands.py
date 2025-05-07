@@ -2015,7 +2015,7 @@ Just show me the edits I need to make.
             self.io.tool_error("Could not determine default branch.")
             return
 
-        current_branch = self.coder.repo.active_branch
+        current_branch = self.coder.repo.repo.active_branch
         if not current_branch:
             self.io.tool_error("Could not determine current branch.")
             return
