@@ -2106,6 +2106,7 @@ Just show me the edits I need to make.
             self.io.tool_output(f"  {i}. {prompt}")
 
         # Use the context manager to automatically confirm prompts
+        commit_history = self.coder.repo.get_commit_history(default_branch, current_branch)
         with self._with_auto_confirm():
             for file_path in code_files:
                 abs_path = os.path.join(self.coder.root, file_path)
@@ -2129,7 +2130,9 @@ Just show me the edits I need to make.
                         cleanup_prompt += f"- {task}\n"
                     cleanup_prompt += (
                         "\nMake sure to preserve the functionality of the code while improving its"
-                        " quality."
+                        " quality. Only make changes to the pieces of the files that have been"
+                        " edited, on this branch.To help you identify those changes here is the"
+                        f" commit history: {commit_history}"
                     )
                     self.cmd_add(file_path)
                     self._run_new_coder(
