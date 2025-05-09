@@ -562,7 +562,6 @@ class Commands:
         self.cmd_drop(" ".join(files2drop))
 
     def _from_plan_exist_strategy(self):
-        self.io.tool_output("\nPlan execution completed!")
         raise SwitchCoder(
             edit_format=self.coder.edit_format,
             summarize_from_coder=False,
@@ -1883,17 +1882,18 @@ class Commands:
             summarize_from_coder=False,
         )
 
-        # Use the ask command to get the step count
-        response = number_of_steps_worker.run(
-            "How many steps are in the plan? Please return only an integer corresponding to"
-            " the number of steps."
-        )
-
         # Use the context manager to automatically confirm prompts
         with self._with_auto_confirm():
             # Extract the number from the response
             try:
-                step_count = int(response)
+                # Use the ask command to get the step count
+                message = (
+                    "How many steps are in the plan? Please return only an integer corresponding to"
+                    " the number of steps."
+                )
+                number_of_steps_worker.run_one(message, preproc=False)
+                number_of_steps_worker.remove_reasoning_content()
+                step_count = int(number_of_steps_worker.partial_response_content)
                 self.io.tool_output(f"Found {step_count} steps in the plan.")
             except ValueError:
                 self.io.tool_output(
@@ -1904,7 +1904,6 @@ class Commands:
                     " Add any files, you require to implement this plan, to this chat."
                 )
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
-                self._from_plan_exist_strategy()
 
         try:
             for i in range(1, step_count + 1):
@@ -1917,6 +1916,8 @@ class Commands:
                 self.io.tool_output(f"Implementing step {j}")
                 prompt = get_step_prompt(i, plan_path)
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
+
+        self.io.tool_output("\nPlan execution completed!")
 
         if switch_coder:
             self._from_plan_exist_strategy()
