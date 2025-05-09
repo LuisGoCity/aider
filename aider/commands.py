@@ -1882,17 +1882,18 @@ class Commands:
             summarize_from_coder=False,
         )
 
-        # Use the ask command to get the step count
-        response = number_of_steps_worker.run(
-            "How many steps are in the plan? Please return only an integer corresponding to"
-            " the number of steps."
-        )
-
         # Use the context manager to automatically confirm prompts
         with self._with_auto_confirm():
             # Extract the number from the response
             try:
-                step_count = int(response)
+                # Use the ask command to get the step count
+                message = (
+                    "How many steps are in the plan? Please return only an integer corresponding to"
+                    " the number of steps."
+                )
+                number_of_steps_worker.run_one(message, preproc=False)
+                number_of_steps_worker.remove_reasoning_content()
+                step_count = int(number_of_steps_worker.partial_response_content)
                 self.io.tool_output(f"Found {step_count} steps in the plan.")
             except ValueError:
                 self.io.tool_output(
