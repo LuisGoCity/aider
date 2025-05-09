@@ -562,7 +562,6 @@ class Commands:
         self.cmd_drop(" ".join(files2drop))
 
     def _from_plan_exist_strategy(self):
-        self.io.tool_output("\nPlan execution completed!")
         raise SwitchCoder(
             edit_format=self.coder.edit_format,
             summarize_from_coder=False,
@@ -1904,7 +1903,6 @@ class Commands:
                     " Add any files, you require to implement this plan, to this chat."
                 )
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
-                self._from_plan_exist_strategy()
 
         try:
             for i in range(1, step_count + 1):
@@ -1917,6 +1915,8 @@ class Commands:
                 self.io.tool_output(f"Implementing step {j}")
                 prompt = get_step_prompt(i, plan_path)
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
+
+        self.io.tool_output("\nPlan execution completed!")
 
         if switch_coder:
             self._from_plan_exist_strategy()
