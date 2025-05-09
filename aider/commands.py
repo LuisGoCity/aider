@@ -1883,6 +1883,7 @@ class Commands:
         )
 
         # Use the context manager to automatically confirm prompts
+        in_one_go = False
         with self._with_auto_confirm():
             # Extract the number from the response
             try:
@@ -1899,22 +1900,25 @@ class Commands:
                 self.io.tool_output(
                     "Unable to determine number of steps. Will try to solve them all at once."
                 )
+                in_one_go = True
+
+            if not in_one_go:
+                try:
+                    for i in range(1, step_count + 1):
+                        self.io.tool_output(f"Implementing step {i}")
+                        prompt = get_step_prompt(i, plan_path)
+                        self._run_new_coder(prompt, [Path(plan_path).name], False)
+                except Exception:
+                    self.io.tool_output(f"Failed to implement step {i}, trying again.")
+                    for j in range(i, step_count + 1):
+                        self.io.tool_output(f"Implementing step {j}")
+                        prompt = get_step_prompt(i, plan_path)
+                        self._run_new_coder(prompt, [Path(plan_path).name], False)
+            else:
                 prompt = (
                     f"Please, implement the plan in the {Path(plan_path).name} file step by step."
                     " Add any files, you require to implement this plan, to this chat."
                 )
-                self._run_new_coder(prompt, [Path(plan_path).name], False)
-
-        try:
-            for i in range(1, step_count + 1):
-                self.io.tool_output(f"Implementing step {i}")
-                prompt = get_step_prompt(i, plan_path)
-                self._run_new_coder(prompt, [Path(plan_path).name], False)
-        except Exception:
-            self.io.tool_output(f"Failed to implement step {i}, trying again.")
-            for j in range(i, step_count + 1):
-                self.io.tool_output(f"Implementing step {j}")
-                prompt = get_step_prompt(i, plan_path)
                 self._run_new_coder(prompt, [Path(plan_path).name], False)
 
         self.io.tool_output("\nPlan execution completed!")
