@@ -1812,6 +1812,8 @@ class Commands:
             # Proceed with PR creation
             self.io.tool_output("Creating pull request with all committed changes...")
             self.cmd_raise_pr()
+            # Update ticket status to "In review"
+            jira.set_ticket_to_review(issue_key_or_id)
 
     def cmd_plan_implementation(self, args):
         "Generate an implementation plan from a JIRA ticket or feature specification file"
