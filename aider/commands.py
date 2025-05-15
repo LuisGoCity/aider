@@ -1889,8 +1889,8 @@ class Commands:
             try:
                 # Use the ask command to get the step count
                 message = (
-                    "How many steps are in the plan? Please return only an integer corresponding to"
-                    " the number of steps."
+                    "How many distinct implementation steps are in this plan? Please respond with"
+                    " just an integer corresponding to the number of steps"
                 )
                 number_of_steps_worker.run_one(message, preproc=False)
                 number_of_steps_worker.remove_reasoning_content()
