@@ -432,9 +432,10 @@ class Commands:
             "Based on the changes in this branch and the files added to chat, please generate a"
             " detailed PR description that explains:\n- What changes were made \n- Why these"
             " changes were made \n- Any important implementation details \n- Any testing"
-            " considerations.\n Make sure the PR description is in Markdown format. \n Do not"
-            " include any mention about the commits to add and delete the implementation plan.\n-"
-            " Make sure the PR description only discusses changes appearing in the commit"
+            " considerations.\n- Make sure the PR description is in Markdown format. \n- Do not"
+            " include any mention about the commits to add and delete the implementation plan.\n -"
+            "Do not include a PR title."
+            "\n- Make sure the PR description only discusses changes appearing in the commit"
             f" history.\nCommit history: \n{commit_history}\n"
         )
 
