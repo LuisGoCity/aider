@@ -26,6 +26,29 @@ class Jira:
         self.json_header = {"Accept": "application/json"}
         self.timestamp_format = "%Y-%m-%dT%H:%M:%S.%f%z"
 
+    def _make_request(self, method, request_url, **kwargs):
+        if method not in ["GET", "PUT", "POST", "DELETE"]:
+            raise Exception(f"Invalid method requested: {method}.")
+
+        url = self.v2_endpoint + request_url
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                params=kwargs.get("params"),
+                headers=(
+                    kwargs.get("json_header") if kwargs.get("json_header") else self.json_header
+                ),
+                auth=self.auth,
+            )
+        except Exception as e:
+            raise Exception(f"Could not make {method} request to url: {url}.\n {e}")
+
+        if response.status_code != 200:
+            raise Exception(f"{method} request for url {url} raised error: {response.status_code}")
+
+        return json.loads(response.text)
+
     def _get_comments_content(self, comments):
         return [
             {
@@ -41,20 +64,14 @@ class Jira:
     def get_issue(self, issue_key_or_id):
         try:
             print(self.v2_endpoint + "/issue" + f"/{issue_key_or_id}")
-            response = requests.request(
+            response = self._make_request(
                 method="GET",
-                url=self.v2_endpoint + "/issue" + f"/{issue_key_or_id}",
-                headers=self.json_header,
-                auth=self.auth,
+                request_url="/issue" + f"/{issue_key_or_id}",
             )
         except Exception as e:
             raise Exception(f"Could not retrieve issue {issue_key_or_id}:\n{e}")
-        if response.status_code != 200:
-            raise Exception(
-                f"Request for issue {issue_key_or_id} raised error: {response.status_code}"
-            )
 
-        return json.loads(response.text)
+        return response
 
     def get_issue_content(self, issue_key_or_id):
         issue = self.get_issue(issue_key_or_id)
