@@ -371,7 +371,20 @@ class Commands:
             return
 
         self._drop_all_files()
+        from aider.coders.base_coder import Coder
 
+        summary_coder = Coder.create(
+            io=self.io,
+            from_coder=self.coder,
+            edit_format="ask",
+            summarize_from_coder=False,
+        )
+        message = "Please summarise the contents of this session in a short paragraph."
+        summary_coder.run_one(message, preproc=False)
+        summary_coder.remove_reasoning_content()
+        summary = summary_coder.partial_response_content
+
+        self._clear_chat_history()
         current_branch = self.coder.repo.repo.active_branch
         default_branch = self.coder.repo.get_default_branch()
         if not default_branch:
@@ -413,8 +426,8 @@ class Commands:
                     selection_prompt = (
                         f"Based on this commit history: {commit_history} over these files"
                         f" {changed_files}, which of these PR templates should be used to raise a"
-                        " PR in this repo. Return only the filename of the most appropriate"
-                        " template. Here are the options:"
+                        " PR in this repo. Avoid scraping any files. Return only the filename of"
+                        " the most appropriate template. Here are the options:"
                         f" {json.dumps(list(template_contents.keys()), indent=4)}"
                     )
                     selected_template_name = ask_coder.run(selection_prompt)
@@ -433,10 +446,10 @@ class Commands:
             " detailed PR description that explains:\n- What changes were made \n- Why these"
             " changes were made \n- Any important implementation details \n- Any testing"
             " considerations.\n- Make sure the PR description is in Markdown format. \n- Do not"
-            " include any mention about the commits to add and delete the implementation plan.\n -"
-            "Do not include a PR title."
-            "\n- Make sure the PR description only discusses changes appearing in the commit"
-            f" history.\nCommit history: \n{commit_history}\n"
+            " include any mention about the commits to add and delete the implementation plan.\n"
+            " -Avoid scraping fies when possible\n -Do not include a PR title.\n- Make sure the PR"
+            " description only discusses changes appearing in the commit history.\nCommit history:"
+            f" \n{commit_history}\n Summary of the session {summary}."
         )
 
         # If a template was found, include it in the prompt
