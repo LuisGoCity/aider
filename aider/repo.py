@@ -645,4 +645,4 @@ class GitRepo:
         else:
             self.io.tool_error("GitHub CLI (gh) not found. Please install it to create PRs.")
             self.io.tool_output("You can create the PR manually using this description.")
-            return False
+            raise Exception("Failed to raise PR.")
