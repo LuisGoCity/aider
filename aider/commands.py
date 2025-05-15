@@ -430,10 +430,12 @@ class Commands:
         # Add prompt for description, including template if found
         description_prompt = (
             "Based on the changes in this branch and the files added to chat, please generate a"
-            " detailed PR description that explains:\n- What changes were made"
-            " \n- Why these changes were made \n- Any important implementation details \n- Any"
-            " testing considerations.\n - Make sure the PR description only discusses changes"
-            f" appearing in the commit history.\nCommit history: \n{commit_history}\n"
+            " detailed PR description that explains:\n- What changes were made \n- Why these"
+            " changes were made \n- Any important implementation details \n- Any testing"
+            " considerations.\n Make sure the PR description is in Markdown format. \n Do not"
+            " include any mention about the commits to add and delete the implementation plan.\n-"
+            " Make sure the PR description only discusses changes appearing in the commit"
+            f" history.\nCommit history: \n{commit_history}\n"
         )
 
         # If a template was found, include it in the prompt
@@ -441,15 +443,16 @@ class Commands:
             description_prompt += (
                 "\nPlease format your response according to the following PR template"
                 f" structure:\n\n{selected_template}\n\nFill in all relevant sections of the"
-                " template with appropriate content based on the changes."
+                " template with appropriate content based on the changes. If there are boxes to be"
+                " ticked, only tickedthe ones where the criteria is met."
             )
 
         # Run description and store output in variable
         pr_description = ask_coder.run(description_prompt)
 
         title_prompt = (
-            "Based on this PR description, generate a concise, descriptive title (one line):\n"
-            f"{pr_description}\n Return only the title text, nothing else."
+            "Based on this PR description, generate a concise, descriptive title (one line) in"
+            f" plain text:\n{pr_description}\n Return only the title text, nothing else."
         )
 
         pr_title = ask_coder.run(title_prompt).strip()
