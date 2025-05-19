@@ -69,6 +69,7 @@ class Commands:
             parser=self.parser,
             verbose=self.verbose,
             editor=self.editor,
+            original_read_only_fnames=self.original_read_only_fnames,
         )
 
     def __init__(
@@ -242,12 +243,18 @@ class Commands:
 
         self.io.tool_output(f"Scraping {url}...")
         if not self.scraper:
-            res = install_playwright(self.io)
-            if not res:
-                self.io.tool_warning("Unable to initialize playwright.")
+            disable_playwright = getattr(self.args, "disable_playwright", False)
+            if disable_playwright:
+                res = False
+            else:
+                res = install_playwright(self.io)
+                if not res:
+                    self.io.tool_warning("Unable to initialize playwright.")
 
             self.scraper = Scraper(
-                print_error=self.io.tool_error, playwright_available=res, verify_ssl=self.verify_ssl
+                print_error=self.io.tool_error,
+                playwright_available=res,
+                verify_ssl=self.verify_ssl,
             )
 
         content = self.scraper.scrape(url) or ""
@@ -361,7 +368,7 @@ class Commands:
             return
 
         commit_message = args.strip() if args else None
-        self.coder.repo.commit(message=commit_message)
+        self.coder.repo.commit(message=commit_message, coder=self.coder)
 
     def cmd_raise_pr(self, args=None):
         "Create a pull request for the current branch with an AI-generated description"
@@ -1549,7 +1556,30 @@ class Commands:
         "Print out the current settings"
         settings = format_settings(self.parser, self.args)
         announcements = "\n".join(self.coder.get_announcements())
+
+        # Build metadata for the active models (main, editor, weak)
+        model_sections = []
+        active_models = [
+            ("Main model", self.coder.main_model),
+            ("Editor model", getattr(self.coder.main_model, "editor_model", None)),
+            ("Weak model", getattr(self.coder.main_model, "weak_model", None)),
+        ]
+        for label, model in active_models:
+            if not model:
+                continue
+            info = getattr(model, "info", {}) or {}
+            if not info:
+                continue
+            model_sections.append(f"{label} ({model.name}):")
+            for k, v in sorted(info.items()):
+                model_sections.append(f"  {k}: {v}")
+            model_sections.append("")  # blank line between models
+
+        model_metadata = "\n".join(model_sections)
+
         output = f"{announcements}\n{settings}"
+        if model_metadata:
+            output += "\n" + model_metadata
         self.io.tool_output(output)
 
     def completions_raw_load(self, document, complete_event):
