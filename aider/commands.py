@@ -2180,9 +2180,10 @@ def expand_subdir(file_path):
 
 def get_step_prompt(step_number, plan_path):
     return (
-        f"Implement only step {step_number} of the plan in in the .md file"
-        f" {Path(plan_path).name}. Add any files, you require to implement this step,"
-        f" to this chat. Once step {step_number} is implemented, stop execution."
+        f"Implement only step {step_number} of the plan in in the .md file {Path(plan_path).name}."
+        " Add any files, you require to implement this step, to this chat. If adding code to an"
+        f" existing file, follow the coding style in that file.Once step {step_number} is"
+        " implemented, stop execution."
     )
 
 
