@@ -1955,53 +1955,51 @@ class TestCommands(TestCase):
             self.assertEqual(len(coder.abs_read_only_fnames), 0)
             self.assertEqual(len(coder.cur_messages), 0)
             self.assertEqual(len(coder.done_messages), 0)
-            
+
     def test_with_auto_confirm_context_manager(self):
-        """Test that the _with_auto_confirm context manager properly sets and restores the confirm_ask method."""
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
         coder = Coder.create(self.GPT35, None, io)
         commands = Commands(io, coder)
-        
+
         # Create a mock for the original confirm_ask method
         original_confirm_ask = io.confirm_ask
-        
+
         # Create a mock for auto_confirm_ask to verify it's being used
         mock_auto_confirm_ask = mock.MagicMock()
         io.auto_confirm_ask = mock_auto_confirm_ask
-        
+
         # Test the context manager
         with commands._with_auto_confirm():
             # Inside the context, confirm_ask should be set to auto_confirm_ask
             self.assertEqual(io.confirm_ask, mock_auto_confirm_ask)
-            
+
             # Call the confirm_ask method to verify it's using auto_confirm_ask
             io.confirm_ask("Test question?")
             mock_auto_confirm_ask.assert_called_once_with("Test question?")
-        
+
         # After exiting the context, confirm_ask should be restored to the original
         self.assertEqual(io.confirm_ask, original_confirm_ask)
-        
+
     def test_with_auto_confirm_with_exception(self):
-        """Test that the _with_auto_confirm context manager restores the original confirm_ask method even when an exception occurs."""
         io = InputOutput(pretty=False, fancy_input=False, yes=True)
         coder = Coder.create(self.GPT35, None, io)
         commands = Commands(io, coder)
-        
+
         # Store the original confirm_ask method
         original_confirm_ask = io.confirm_ask
-        
+
         # Test the context manager with an exception
         try:
             with commands._with_auto_confirm():
                 # Inside the context, confirm_ask should be set to auto_confirm_ask
                 self.assertEqual(io.confirm_ask, io.auto_confirm_ask)
-                
+
                 # Raise an exception
                 raise ValueError("Test exception")
         except ValueError:
             # Exception should be propagated
             pass
-        
+
         # After exiting the context, confirm_ask should be restored to the original
         # even though an exception was raised
         self.assertEqual(io.confirm_ask, original_confirm_ask)
@@ -2064,7 +2062,7 @@ class TestCommands(TestCase):
 
                     # Verify that _from_plan_exist_strategy was called once
                     mock_from_plan_exist_strategy.assert_called_once()
-                    
+
                     # Verify that _with_auto_confirm was called once
                     mock_with_auto_confirm.assert_called_once()
 
@@ -2477,6 +2475,98 @@ class TestCommands(TestCase):
                     mock_tool_error.assert_any_call(
                         "Command '/model gpt-4' is only supported in interactive mode, skipping."
                     )
+
+    def test_reset_after_coder_clone_preserves_original_read_only_files(self):
+        with GitTemporaryDirectory() as _:
+            repo_dir = str(".")
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+
+            orig_ro_path = Path(repo_dir) / "orig_ro.txt"
+            orig_ro_path.write_text("original read only")
+
+            editable_path = Path(repo_dir) / "editable.txt"
+            editable_path.write_text("editable content")
+
+            other_ro_path = Path(repo_dir) / "other_ro.txt"
+            other_ro_path.write_text("other read only")
+
+            original_read_only_fnames_set = {str(orig_ro_path)}
+
+            # Create the initial Coder
+            orig_coder = Coder.create(main_model=self.GPT35, io=io, fnames=[], repo=None)
+            orig_coder.root = repo_dir  # Set root for path operations
+
+            # Replace its commands object with one that has the original_read_only_fnames
+            orig_coder.commands = Commands(
+                io, orig_coder, original_read_only_fnames=list(original_read_only_fnames_set)
+            )
+            orig_coder.commands.coder = orig_coder
+
+            # Populate coder's file sets
+            orig_coder.abs_read_only_fnames.add(str(orig_ro_path))
+            orig_coder.abs_fnames.add(str(editable_path))
+            orig_coder.abs_read_only_fnames.add(str(other_ro_path))
+
+            # Simulate SwitchCoder by creating a new coder from the original one
+            new_coder = Coder.create(from_coder=orig_coder)
+            new_commands = new_coder.commands
+
+            # Perform /reset
+            new_commands.cmd_reset("")
+
+            # Assertions for /reset
+            self.assertEqual(len(new_coder.abs_fnames), 0)
+            self.assertEqual(len(new_coder.abs_read_only_fnames), 1)
+            # self.assertIn(str(orig_ro_path), new_coder.abs_read_only_fnames)
+            self.assertTrue(
+                any(os.path.samefile(p, str(orig_ro_path)) for p in new_coder.abs_read_only_fnames),
+                f"File {str(orig_ro_path)} not found in {new_coder.abs_read_only_fnames}",
+            )
+            self.assertEqual(len(new_coder.done_messages), 0)
+            self.assertEqual(len(new_coder.cur_messages), 0)
+
+    def test_drop_bare_after_coder_clone_preserves_original_read_only_files(self):
+        with GitTemporaryDirectory() as _:
+            repo_dir = str(".")
+            io = InputOutput(pretty=False, fancy_input=False, yes=True)
+
+            orig_ro_path = Path(repo_dir) / "orig_ro.txt"
+            orig_ro_path.write_text("original read only")
+
+            editable_path = Path(repo_dir) / "editable.txt"
+            editable_path.write_text("editable content")
+
+            other_ro_path = Path(repo_dir) / "other_ro.txt"
+            other_ro_path.write_text("other read only")
+
+            original_read_only_fnames_set = {str(orig_ro_path)}
+
+            orig_coder = Coder.create(main_model=self.GPT35, io=io, fnames=[], repo=None)
+            orig_coder.root = repo_dir
+            orig_coder.commands = Commands(
+                io, orig_coder, original_read_only_fnames=list(original_read_only_fnames_set)
+            )
+            orig_coder.commands.coder = orig_coder
+
+            orig_coder.abs_read_only_fnames.add(str(orig_ro_path))
+            orig_coder.abs_fnames.add(str(editable_path))
+            orig_coder.abs_read_only_fnames.add(str(other_ro_path))
+            orig_coder.done_messages = [{"role": "user", "content": "d1"}]
+            orig_coder.cur_messages = [{"role": "user", "content": "c1"}]
+
+            new_coder = Coder.create(from_coder=orig_coder)
+            new_commands = new_coder.commands
+            new_commands.cmd_drop("")
+
+            self.assertEqual(len(new_coder.abs_fnames), 0)
+            self.assertEqual(len(new_coder.abs_read_only_fnames), 1)
+            # self.assertIn(str(orig_ro_path), new_coder.abs_read_only_fnames)
+            self.assertTrue(
+                any(os.path.samefile(p, str(orig_ro_path)) for p in new_coder.abs_read_only_fnames),
+                f"File {str(orig_ro_path)} not found in {new_coder.abs_read_only_fnames}",
+            )
+            self.assertEqual(new_coder.done_messages, [{"role": "user", "content": "d1"}])
+            self.assertEqual(new_coder.cur_messages, [{"role": "user", "content": "c1"}])
 
     # Tests for cmd_plan_implementation
 
@@ -3385,10 +3475,10 @@ class TestCommands(TestCase):
                     # Verify that tool_error was called when file removal fails
                     self.assertEqual(mock_remove.call_count, 2)
                     mock_tool_error.assert_any_call(mock.ANY)
-                    
+
     def test_cmd_solve_jira_with_code_cleanup(self):
-        """Test that cmd_solve_jira correctly triggers code cleanup when --with-code-cleanup flag is provided"""
         with GitTemporaryDirectory() as repo_dir:
+            repo_dir = repo_dir
             io = InputOutput(pretty=False, fancy_input=False, yes=True)
             coder = Coder.create(self.GPT35, None, io)
             commands = Commands(io, coder)
@@ -3432,10 +3522,10 @@ class TestCommands(TestCase):
 
                 # Verify that cmd_clean_code was not called
                 mock_clean_code.assert_not_called()
-                
+
     def test_cmd_solve_jira_with_combined_flags(self):
-        """Test that cmd_solve_jira correctly handles both --with-pr and --with-code-cleanup flags together"""
         with GitTemporaryDirectory() as repo_dir:
+            repo_dir = repo_dir
             io = InputOutput(pretty=False, fancy_input=False, yes=True)
             coder = Coder.create(self.GPT35, None, io)
             commands = Commands(io, coder)
@@ -3467,35 +3557,37 @@ class TestCommands(TestCase):
                 # Verify that both methods were called
                 mock_clean_code.assert_called_once_with("low")
                 mock_raise_pr.assert_called_once()
-                
+
                 # Reset mocks for the next test
                 mock_clean_code.reset_mock()
                 mock_raise_pr.reset_mock()
-                
+
                 # Test with short form flags
                 commands.cmd_solve_jira("TEST-123 -pr -cleanup")
-                
+
                 # Verify that both methods were called
                 mock_clean_code.assert_called_once_with("low")
                 mock_raise_pr.assert_called_once()
-                
+
                 # Create a mock manager to track call order
                 manager = mock.MagicMock()
-                manager.attach_mock(mock_clean_code, 'clean_code')
-                manager.attach_mock(mock_raise_pr, 'raise_pr')
-                
+                manager.attach_mock(mock_clean_code, "clean_code")
+                manager.attach_mock(mock_raise_pr, "raise_pr")
+
                 # Reset mocks for the order test
                 mock_clean_code.reset_mock()
                 mock_raise_pr.reset_mock()
-                
+
                 # Test again to verify order
                 commands.cmd_solve_jira("TEST-123 --with-pr --with-code-cleanup")
-                
+
                 # Check that clean_code was called before raise_pr
                 call_names = [call[0] for call in manager.method_calls]
-                clean_index = call_names.index('clean_code')
-                pr_index = call_names.index('raise_pr')
-                self.assertLess(clean_index, pr_index, "Code cleanup should be performed before PR creation")
+                clean_index = call_names.index("clean_code")
+                pr_index = call_names.index("raise_pr")
+                self.assertLess(
+                    clean_index, pr_index, "Code cleanup should be performed before PR creation"
+                )
 
     def test_cmd_raise_pr_with_template(self):
         """Test that cmd_raise_pr correctly uses PR templates when available"""
